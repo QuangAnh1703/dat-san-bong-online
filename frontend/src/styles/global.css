@@ -52,11 +52,11 @@ header{position:sticky;top:0;z-index:40;background:var(--ink);color:#EAF0EA;bord
 nav.main{display:flex;gap:22px;flex:1}
 nav.main a{color:#C9D6CD;text-decoration:none;font-size:14.5px;font-weight:500;padding:6px 0;border-bottom:2px solid transparent}
 nav.main a:hover{color:#fff}
-nav.main a[aria-current]{color:#fff;border-bottom-color:var(--amber)}
+nav.main a.is-active{color:#fff;border-bottom-color:var(--amber)}
 .hact{display:flex;align-items:center;gap:14px}
 .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,.3);color:#EAF0EA;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer}
 .btn-ghost:hover{border-color:#fff;background:rgba(255,255,255,.06)}
-.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(150deg,#2E8B62,#134C36);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer}
+.avatar{text-decoration:none;width:34px;height:34px;border-radius:50%;background:linear-gradient(150deg,#2E8B62,#134C36);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer}
 
 /* ---------------- Hero ---------------- */
 .hero{position:relative;background:var(--ink);color:#fff;overflow:hidden;padding:56px 0 96px}
@@ -133,7 +133,7 @@ section{padding:44px 0}
 .deal .mini span{position:absolute;inset:0;border:1px solid rgba(255,255,255,.22);border-radius:8px}
 .deal .mini span::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.22)}
 .deal-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
-.deal-info b{font-size:14.5px;font-weight:600;color:#fff}
+.deal-info b{font-size:14.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .deal-price{white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:#C9D6CD;font-variant-numeric:tabular-nums}
 .deal-price s{color:#7E8D84;margin-right:6px}
 .deal-price strong{color:var(--amber);font-size:15px}
@@ -143,7 +143,7 @@ section{padding:44px 0}
 
 /* ---------------- Trang thai ---------------- */
 .state{border:1px dashed var(--line-strong);border-radius:var(--radius);padding:28px;text-align:center;color:var(--text-2);background:var(--surface)}
-.state b{display:block;color:var(--text);margin-bottom:4px}
+.state b{display:block;color:var(--text);margin-bottom:6px;font-size:16px}
 .banner{display:flex;align-items:center;gap:10px;border-radius:10px;padding:11px 14px;font-size:13.5px;margin-bottom:18px}
 .banner.warn{background:#FDF3E2;border:1px solid #F0DBB4;color:#7A5410}
 .skeleton{background:linear-gradient(90deg,var(--surface-2) 25%,#E3E8DE 37%,var(--surface-2) 63%);
