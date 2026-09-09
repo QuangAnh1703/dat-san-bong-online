@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. CSDL - docker compose up",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": { "cwd": "${workspaceFolder}/csdl" },
+      "problemMatcher": []
+    },
+    {
+      "label": "2. Backend - npm run dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "3. Frontend - npm run dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "CHAY TAT CA",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "1. CSDL - docker compose up",
+        "2. Backend - npm run dev",
+        "3. Frontend - npm run dev"
+      ],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}

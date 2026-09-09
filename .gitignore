@@ -15,7 +15,9 @@ csdl/pgdata/
 # He dieu hanh / IDE
 .DS_Store
 Thumbs.db
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
 .idea/
 
 # Log & tam
