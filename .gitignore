@@ -1,0 +1,23 @@
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Bien moi truong (KHONG commit mat khau)
+.env
+.env.local
+*.env
+
+# Docker volume / du lieu
+csdl/pgdata/
+*.bak
+
+# He dieu hanh / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Log & tam
+*.log
+tmp/

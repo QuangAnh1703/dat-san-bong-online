@@ -1,0 +1,66 @@
+# ============================================================
+# CSDL + API cho Nen tang dat san bong da truc tuyen
+# Chay CSDL:        docker compose up -d
+# Chay ca API:      docker compose --profile app up -d --build
+# Dung:             docker compose down            (giu du lieu)
+# Xoa sach lam lai: docker compose down -v
+# ============================================================
+services:
+  db:
+    image: postgres:16
+    container_name: sanbong-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sanbong
+      POSTGRES_USER: sanbong
+      POSTGRES_PASSWORD: sanbong123
+      TZ: Asia/Ho_Chi_Minh
+      PGTZ: Asia/Ho_Chi_Minh
+    ports:
+      # 5433 tren may -> 5432 trong container.
+      # Dung 5433 vi PostgreSQL 18 cai san tren may da chiem 5432.
+      - "5433:5432"
+    volumes:
+      # Cac file V01..V10 tu chay theo thu tu ten khi container khoi tao lan dau
+      - ./db/migration:/docker-entrypoint-initdb.d:ro
+      - sanbong_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sanbong -d sanbong"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Cong cu quan tri CSDL qua trinh duyet: http://localhost:8081
+  # Dang nhap: System=PostgreSQL, Server=db, User=sanbong, Password=sanbong123, Database=sanbong
+  adminer:
+    image: adminer:4
+    container_name: sanbong-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # API Node.js/Express: http://localhost:3000
+  # Chi chay khi them --profile app
+  api:
+    build:
+      context: ../api
+    container_name: sanbong-api
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      # Trong mang Docker, host CSDL la ten service "db", khong phai localhost
+      DATABASE_URL: postgresql://sanbong:sanbong123@db:5432/sanbong
+      PORT: "3000"
+      HOLD_MINUTES: "15"
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  sanbong_data:
