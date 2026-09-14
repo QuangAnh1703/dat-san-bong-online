@@ -38,6 +38,7 @@ const ERRORS = {
   // --- 5xx ---
   DB_UNAVAILABLE:     { status: 503, message: 'Khong ket noi duoc co so du lieu' },
   INTERNAL_ERROR:     { status: 500, message: 'Loi may chu' },
+  NOT_IMPLEMENTED:    { status: 501, message: 'Chuc nang chua duoc trien khai' },
 };
 
 class AppError extends Error {

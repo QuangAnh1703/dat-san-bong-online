@@ -77,8 +77,11 @@ router.get('/docs', (_req, res) => {
 </html>`);
 });
 
-router.use('/api/venues', require('./venues'));
-router.use('/api/fields', require('./fields'));
-router.use('/api/bookings', require('./bookings'));
+router.use('/api/auth', require('../modules/auth/auth.routes'));
+router.use('/api/venues', require('../modules/venues/venues.routes'));
+router.use('/api/fields', require('../modules/venues/fields.routes'));
+router.use('/api/bookings', require('../modules/bookings/bookings.routes'));
+router.use('/api/payments', require('../modules/payments/payments.routes'));
+router.use('/api/community', require('../modules/community/community.routes'));
 
 module.exports = router;

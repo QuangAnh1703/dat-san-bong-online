@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
-const { query } = require('../db');
-const { AppError, requireFields } = require('../lib/errors');
+const { query } = require('../../db');
+const { AppError, requireFields } = require('../../lib/errors');
 const router = express.Router();
 
 // GET /api/fields/:id/schedule?date=2026-09-10

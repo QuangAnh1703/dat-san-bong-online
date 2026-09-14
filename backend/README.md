@@ -13,8 +13,13 @@ docker compose up -d          # bat PostgreSQL truoc
 cd D:\DoAn\backend
 copy .env.example .env
 npm install
-npm run dev                   # http://localhost:3000
+npm run migrate                # ghi nhan/ap dung migration (chi can chay 1 lan)
+npm run dev                    # http://localhost:3000
 ```
+
+Mỗi lần khởi động, server tự **validate** schema khớp với các file migration trong
+`../csdl/db/migration` (không tự sửa DB) - tương đương `ddl-auto: validate` bên
+Spring/Hibernate. Nếu lệch, server dừng lại và yêu cầu chạy `npm run migrate` trước.
 
 `.env` khi chay ngoai Docker:
 
@@ -34,17 +39,25 @@ File dac ta: `../docs/openapi.yaml`.
 
 ## Cau truc
 
+Package chia theo **5 nhom nghiep vu**, khop voi cac file migration trong
+`../csdl/db/migration` (auth <- V02, venues <- V03+V04, bookings <- V05,
+payments <- V06, community <- V07+V08). `payments` va `community` moi co
+skeleton (tra `NOT_IMPLEMENTED`), se trien khai o sprint sau.
+
 ```
 src/
-├── server.js          Khoi tao app, CORS, lang nghe cong
-├── db.js              Connection pool (toi da 10 ket noi) + waitForDb()
-├── lib/errors.js      Bang ma loi, lop AppError, fromDbError, requireFields
-├── middlewares/       requestId, requestLogger, notFound, errorHandler
-└── routes/
-    ├── index.js       /health, /docs, /openapi.yaml, /api/districts
-    ├── venues.js      /api/venues
-    ├── fields.js      /api/fields
-    └── bookings.js    /api/bookings
+├── server.js              Khoi tao app, CORS, validate schema, lang nghe cong
+├── db.js                  Connection pool (toi da 10 ket noi) + waitForDb()
+├── db/migrate.js          Migration runner (baseline + apply + validate), thay Flyway
+├── lib/errors.js          Bang ma loi, lop AppError, fromDbError, requireFields
+├── middlewares/           requestId, requestLogger, notFound, errorHandler
+├── routes/index.js        /health, /docs, /openapi.yaml, /api/districts + mount modules
+└── modules/
+    ├── auth/              /api/auth        (skeleton, NOT_IMPLEMENTED)
+    ├── venues/            /api/venues, /api/fields
+    ├── bookings/          /api/bookings
+    ├── payments/          /api/payments    (skeleton, NOT_IMPLEMENTED)
+    └── community/         /api/community   (skeleton, NOT_IMPLEMENTED)
 ```
 
 ## Endpoint

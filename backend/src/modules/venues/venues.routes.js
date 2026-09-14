@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
-const { query } = require('../db');
-const { AppError } = require('../lib/errors');
+const { query } = require('../../db');
+const { AppError } = require('../../lib/errors');
 const router = express.Router();
 
 // GET /api/venues?district=CG&q=my dinh

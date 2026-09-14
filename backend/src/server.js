@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const { waitForDb, pool } = require('./db');
+const { validate: validateSchema } = require('./db/migrate');
 const { requestId, requestLogger, notFound, errorHandler } = require('./middlewares');
 const routes = require('./routes');
 
@@ -27,6 +28,13 @@ const PORT = Number(process.env.PORT || 3000);
 
 (async () => {
   await waitForDb();
+  try {
+    await validateSchema();
+  } catch (err) {
+    console.error('[migrate] schema khong khop migration: %s', err.message);
+    console.error('[migrate] chay "npm run migrate" roi khoi dong lai server');
+    process.exit(1);
+  }
   const server = app.listen(PORT, () => {
     console.log('API chay tai http://localhost:%d', PORT);
     console.log('Cho phep goi tu: %s', ORIGINS.join(', '));

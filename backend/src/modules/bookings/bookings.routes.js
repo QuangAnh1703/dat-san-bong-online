@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
-const { query, withTransaction } = require('../db');
-const { AppError, requireFields } = require('../lib/errors');
+const { query, withTransaction } = require('../../db');
+const { AppError, requireFields } = require('../../lib/errors');
 const router = express.Router();
 
 const HOLD_MINUTES = Number(process.env.HOLD_MINUTES || 15);
