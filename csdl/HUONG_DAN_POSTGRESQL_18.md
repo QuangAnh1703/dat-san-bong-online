@@ -12,7 +12,7 @@ PostgreSQL 18 trên máy đang chiếm cổng **5432**. Vì vậy `docker-compos
 |---|---|---|
 | PostgreSQL 18 cài trên máy | `localhost` | **5432** |
 | Container `sanbong-db` | `localhost` | **5433** |
-| Từ trong mạng Docker (Adminer, service `api`) | `db` | 5432 |
+| Từ trong mạng Docker (Adminer, service `backend`) | `db` | 5432 |
 
 Hai bên chạy song song được, không xung đột.
 
@@ -59,7 +59,7 @@ Xem tab **Messages**, phải thấy 11 dòng `TC-01 DAT` … `TC-11 DAT`.
 
 ## Bước 5 — Nối app Node vào PostgreSQL 18
 
-Trong `D:\DoAn\api\.env`:
+Trong `D:\DoAn\backend\.env`:
 
 ```
 DATABASE_URL=postgresql://postgres:MAT_KHAU_CUA_BAN@localhost:5432/sanbong
@@ -70,7 +70,7 @@ HOLD_MINUTES=15
 Rồi:
 
 ```powershell
-cd D:\DoAn\api
+cd D:\DoAn\backend
 npm install
 npm start
 ```
