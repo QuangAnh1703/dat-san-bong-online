@@ -34,6 +34,7 @@ servers:
 
 tags:
   - name: He thong
+  - name: Xac thuc
   - name: Cum san
   - name: San con
   - name: Dat san
@@ -75,6 +76,53 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/District' }
+
+  /api/auth/register:
+    post:
+      tags: [Xac thuc]
+      summary: Dang ky tai khoan bang so dien thoai
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Tao tai khoan thanh cong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Thieu truong bat buoc, SDT sai dinh dang (`INVALID_PHONE`) hoac mat khau qua ngan (`WEAK_PASSWORD`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: SDT da duoc dang ky (`PHONE_TAKEN`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/login:
+    post:
+      tags: [Xac thuc]
+      summary: Dang nhap bang so dien thoai, nhan JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Dang nhap thanh cong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401':
+          description: Sai SDT hoac mat khau (`INVALID_CREDENTIALS`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /api/venues:
     get:
@@ -371,24 +419,64 @@ components:
                 - MISSING_FIELD
                 - INVALID_TIME_RANGE
                 - CONSTRAINT_VIOLATED
+                - INVALID_PHONE
+                - WEAK_PASSWORD
                 - UNAUTHENTICATED
                 - FORBIDDEN
+                - INVALID_CREDENTIALS
                 - NOT_FOUND
                 - VENUE_NOT_FOUND
                 - FIELD_NOT_FOUND
                 - BOOKING_NOT_FOUND
                 - ROUTE_NOT_FOUND
                 - SLOT_TAKEN
+                - PHONE_TAKEN
                 - VENUE_NOT_APPROVED
                 - NO_PRICE_RULE
                 - INVALID_STATUS
                 - HOLD_EXPIRED
                 - DB_UNAVAILABLE
                 - INTERNAL_ERROR
+                - NOT_IMPLEMENTED
             message:   { type: string, description: Cau thong bao tieng Viet cho nguoi dung }
             details:   { type: object, description: Thong tin phu de debug hoac to mau o truong sai }
             requestId: { type: string, description: Trung voi header X-Request-Id }
             timestamp: { type: string, format: date-time }
+
+    RegisterRequest:
+      type: object
+      required: [phone, password, full_name]
+      properties:
+        phone:         { type: string, example: '0912345678', description: '10 so, bat dau bang 0' }
+        password:      { type: string, format: password, example: matkhau123, description: Toi thieu 6 ky tu }
+        full_name:     { type: string, example: Nguyen Van A }
+        district_code: { type: string, example: CG }
+
+    LoginRequest:
+      type: object
+      required: [phone, password]
+      properties:
+        phone:    { type: string, example: '0912345678' }
+        password: { type: string, format: password }
+
+    User:
+      type: object
+      properties:
+        id:             { type: integer }
+        phone:          { type: string, example: '0912345678' }
+        role:           { type: string, enum: [PLAYER, OWNER, ADMIN] }
+        status:         { type: string, enum: [PENDING_VERIFY, ACTIVE, LOCKED] }
+        phone_verified: { type: boolean }
+        full_name:      { type: string }
+        district_code:  { type: string }
+        skill_level:    { type: string, enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO] }
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:  { type: string, description: JWT, het han theo JWT_ACCESS_EXPIRES }
+        refresh_token: { type: string, description: JWT, het han theo JWT_REFRESH_EXPIRES }
+        user:          { $ref: '#/components/schemas/User' }
 
     District:
       type: object

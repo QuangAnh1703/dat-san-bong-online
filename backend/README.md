@@ -28,6 +28,10 @@ DATABASE_URL=postgresql://sanbong:sanbong123@localhost:5433/sanbong
 PORT=3000
 HOLD_MINUTES=15
 CORS_ORIGIN=http://localhost:5173
+JWT_ACCESS_SECRET=doi-chuoi-bi-mat-that-dai-o-day
+JWT_REFRESH_SECRET=doi-chuoi-bi-mat-khac-o-day
+JWT_ACCESS_EXPIRES=15m
+JWT_REFRESH_EXPIRES=7d
 ```
 
 Chay **trong** Docker thi host la `db` (ten service), chay **ngoai** Docker thi dung `localhost`.
@@ -53,7 +57,7 @@ src/
 ├── middlewares/           requestId, requestLogger, notFound, errorHandler
 ├── routes/index.js        /health, /docs, /openapi.yaml, /api/districts + mount modules
 └── modules/
-    ├── auth/              /api/auth        (skeleton, NOT_IMPLEMENTED)
+    ├── auth/              /api/auth/register, /api/auth/login (BCrypt + JWT)
     ├── venues/            /api/venues, /api/fields
     ├── bookings/          /api/bookings
     ├── payments/          /api/payments    (skeleton, NOT_IMPLEMENTED)
@@ -68,6 +72,8 @@ src/
 | GET | `/openapi.yaml` | File dac ta OpenAPI 3.0 |
 | GET | `/health` | Kiem tra ket noi CSDL, dem so bang |
 | GET | `/api/districts` | Danh sach quan/huyen |
+| POST | `/api/auth/register` | Dang ky bang SDT + mat khau (bam BCrypt) |
+| POST | `/api/auth/login` | Dang nhap, tra `access_token` + `refresh_token` (JWT) |
 | GET | `/api/venues?district=&q=` | Tim cum san da duyet |
 | GET | `/api/venues/:id` | Chi tiet + san con + tien ich + bang gia |
 | GET | `/api/venues/:id/revenue` | Doanh thu theo ngay (view `v_venue_daily_revenue`) |
@@ -112,9 +118,13 @@ Moi loi deu co cung cau truc, sinh tai **mot cho duy nhat** (`middlewares/errorH
 |---|---|---|
 | `MISSING_FIELD` | 400 | Thieu truong bat buoc, `details.missing` liet ke ten truong |
 | `CONSTRAINT_VIOLATED` | 400 | Vi pham CHECK: thoi luong ngoai 1-4 gio, SDT sai dinh dang... |
+| `INVALID_PHONE` | 400 | SDT dang ky/dang nhap khong dung dinh dang 10 so, bat dau bang 0 |
+| `WEAK_PASSWORD` | 400 | Mat khau dang ky duoi 6 ky tu |
+| `INVALID_CREDENTIALS` | 401 | Sai SDT hoac mat khau khi dang nhap |
 | `FIELD_NOT_FOUND` | 404 | San khong ton tai hoac dang tam ngung |
 | `BOOKING_NOT_FOUND` | 404 | Khong tim thay don |
 | `SLOT_TAKEN` | 409 | Khung gio da co nguoi giu (rang buoc EXCLUDE `no_slot_overlap`) |
+| `PHONE_TAKEN` | 409 | SDT dang ky da co tai khoan khac su dung |
 | `NO_PRICE_RULE` | 409 | Chua co bang gia cho khung gio do |
 | `VENUE_NOT_APPROVED` | 409 | Cum san chua duoc duyet |
 | `INVALID_STATUS` | 409 | Don o trang thai khong cho thao tac |

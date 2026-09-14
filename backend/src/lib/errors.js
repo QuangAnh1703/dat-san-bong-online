@@ -16,10 +16,13 @@ const ERRORS = {
   MISSING_FIELD:      { status: 400, message: 'Thieu truong bat buoc' },
   INVALID_TIME_RANGE: { status: 400, message: 'Khung gio khong hop le' },
   CONSTRAINT_VIOLATED:{ status: 400, message: 'Du lieu vi pham rang buoc nghiep vu' },
+  INVALID_PHONE:      { status: 400, message: 'So dien thoai khong hop le (10 so, bat dau bang 0)' },
+  WEAK_PASSWORD:      { status: 400, message: 'Mat khau phai co it nhat 6 ky tu' },
 
   // --- 401 / 403 ---
   UNAUTHENTICATED:    { status: 401, message: 'Ban can dang nhap' },
   FORBIDDEN:          { status: 403, message: 'Ban khong co quyen thuc hien' },
+  INVALID_CREDENTIALS:{ status: 401, message: 'So dien thoai hoac mat khau khong dung' },
 
   // --- 404 ---
   NOT_FOUND:          { status: 404, message: 'Khong tim thay du lieu' },
@@ -30,6 +33,7 @@ const ERRORS = {
 
   // --- 409 Xung dot nghiep vu ---
   SLOT_TAKEN:         { status: 409, message: 'Khung gio nay da co nguoi dat' },
+  PHONE_TAKEN:        { status: 409, message: 'So dien thoai nay da duoc dang ky' },
   VENUE_NOT_APPROVED: { status: 409, message: 'Cum san chua duoc duyet' },
   NO_PRICE_RULE:      { status: 409, message: 'Chua co bang gia cho khung gio nay' },
   INVALID_STATUS:     { status: 409, message: 'Don dang o trang thai khong cho phep thao tac nay' },
