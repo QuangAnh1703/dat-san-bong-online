@@ -1,0 +1,508 @@
+openapi: 3.0.3
+
+info:
+  title: API Nen tang dat san bong da truc tuyen
+  version: 1.0.0
+  description: |
+    Dac ta nhom endpoint loi cua he thong dat san bong da.
+
+    ## Dinh dang phan hoi loi
+    Moi loi deu tra ve cung mot cau truc, sinh tai mot cho duy nhat
+    (`backend/src/middlewares/errorHandler`):
+
+    ```json
+    {
+      "error": {
+        "code": "SLOT_TAKEN",
+        "message": "Khung gio nay da co nguoi dat",
+        "details": { "field_id": 3 },
+        "requestId": "3f7c...",
+        "timestamp": "2026-09-14T12:30:00.000Z"
+      }
+    }
+    ```
+
+    - `code` la ma **on dinh**, client xu ly theo ma nay chu khong theo `message`.
+    - `message` la cau tieng Viet de hien thang cho nguoi dung.
+    - `requestId` cung xuat hien o header `X-Request-Id`, dung de doi chieu log server.
+
+    Bang ma loi day du xem tai `backend/src/lib/errors.js`.
+
+servers:
+  - url: http://localhost:3000
+    description: May phat trien
+
+tags:
+  - name: He thong
+  - name: Cum san
+  - name: San con
+  - name: Dat san
+
+paths:
+  /health:
+    get:
+      tags: [He thong]
+      summary: Kiem tra ket noi co so du lieu
+      responses:
+        '200':
+          description: Ket noi binh thuong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:      { type: string, example: ok }
+                  db:          { type: string, example: sanbong }
+                  user:        { type: string, example: sanbong }
+                  tables:      { type: integer, example: 21 }
+                  server_time: { type: string, format: date-time }
+        '503':
+          $ref: '#/components/responses/DbUnavailable'
+
+  /api/districts:
+    get:
+      tags: [He thong]
+      summary: Danh sach quan/huyen
+      responses:
+        '200':
+          description: Danh sach quan/huyen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer, example: 6 }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/District' }
+
+  /api/venues:
+    get:
+      tags: [Cum san]
+      summary: Tim cum san da duoc duyet
+      parameters:
+        - name: district
+          in: query
+          description: Ma quan/huyen, vi du `CG`
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Tu khoa tim trong ten hoac dia chi
+          schema: { type: string }
+      responses:
+        '200':
+          description: Danh sach cum san, sap xep theo diem danh gia giam dan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/VenueSummary' }
+
+  /api/venues/{id}:
+    get:
+      tags: [Cum san]
+      summary: Chi tiet cum san kem san con, tien ich va bang gia
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      responses:
+        '200':
+          description: Chi tiet cum san
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VenueDetail' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/venues/{id}/revenue:
+    get:
+      tags: [Cum san]
+      summary: Doanh thu theo ngay (60 ngay gan nhat)
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      responses:
+        '200':
+          description: Doanh thu theo ngay
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        venue_id:      { type: integer }
+                        play_date:     { type: string, format: date }
+                        booking_count: { type: integer }
+                        revenue:       { type: integer }
+
+  /api/fields/{id}/schedule:
+    get:
+      tags: [San con]
+      summary: So do lich cua mot san con trong ngay
+      description: Nguon du lieu cho man hinh WF-03 (so do lich real-time).
+      parameters:
+        - $ref: '#/components/parameters/FieldId'
+        - name: date
+          in: query
+          description: Ngay can xem, mac dinh hom nay
+          schema: { type: string, format: date, example: '2026-09-20' }
+      responses:
+        '200':
+          description: Danh sach khung gio trong ngay
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  field_id:  { type: integer }
+                  play_date: { type: string, format: date }
+                  count:     { type: integer }
+                  slots:
+                    type: array
+                    items: { $ref: '#/components/schemas/Slot' }
+
+  /api/fields/{id}/availability:
+    get:
+      tags: [San con]
+      summary: Kiem tra mot khung gio con trong khong
+      parameters:
+        - $ref: '#/components/parameters/FieldId'
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: start
+          in: query
+          required: true
+          schema: { type: string, example: '19:30' }
+        - name: end
+          in: query
+          required: true
+          schema: { type: string, example: '21:00' }
+      responses:
+        '200':
+          description: Ket qua kiem tra
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  field_id:  { type: integer }
+                  date:      { type: string, format: date }
+                  start:     { type: string }
+                  end:       { type: string }
+                  available: { type: boolean }
+        '400':
+          description: Thieu tham so bat buoc (`MISSING_FIELD`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/bookings:
+    post:
+      tags: [Dat san]
+      summary: Tao don dat san va giu khung gio
+      description: |
+        Don duoc tao o trang thai `HELD` kem `hold_expires_at`.
+        Rang buoc `EXCLUDE` o tang CSDL dam bao hai nguoi dat cung khung gio
+        thi nguoi sau nhan loi `SLOT_TAKEN` - chong dat trung ngay ca khi chay song song.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBookingRequest' }
+      responses:
+        '201':
+          description: Tao don thanh cong, khung gio da duoc giu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Booking' }
+        '400':
+          description: Thieu truong bat buoc hoac vi pham rang buoc
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                MISSING_FIELD:
+                  value:
+                    error:
+                      code: MISSING_FIELD
+                      message: 'Thieu truong bat buoc: user_id'
+                      details: { missing: [user_id] }
+                      requestId: 3f7c9b12-1f0a-4c2e-9f11-2b7d4e8a91c3
+                      timestamp: '2026-09-14T12:30:00.000Z'
+        '404':
+          description: San khong ton tai (`FIELD_NOT_FOUND`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Xung dot nghiep vu:
+            `SLOT_TAKEN` khung gio da co nguoi dat,
+            `NO_PRICE_RULE` chua co bang gia,
+            `VENUE_NOT_APPROVED` cum san chua duoc duyet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                SLOT_TAKEN:
+                  value:
+                    error:
+                      code: SLOT_TAKEN
+                      message: Khung gio nay da co nguoi dat
+                      requestId: 8a2f1c04-77bd-4f3a-8c19-51e0b7f2a6dd
+                      timestamp: '2026-09-14T12:30:00.000Z'
+
+  /api/bookings/{code}:
+    get:
+      tags: [Dat san]
+      summary: Tra cuu don theo ma
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, example: BK260914A7K2M }
+      responses:
+        '200':
+          description: Chi tiet don kem khung gio va giao dich thanh toan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/bookings/{code}/cancel:
+    post:
+      tags: [Dat san]
+      summary: Huy don va tra lai khung gio
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, example: Ban dot xuat }
+      responses:
+        '200':
+          description: Da huy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:            { type: string }
+                  status:          { type: string, example: CANCELLED_BY_USER }
+                  released_slots:  { type: integer }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Don o trang thai khong cho huy (`INVALID_STATUS`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/bookings/maintenance/release-expired:
+    post:
+      tags: [Dat san]
+      summary: Don cac don giu cho da qua han
+      description: Goi ham `fn_release_expired_holds()` trong CSDL. Dung cho cron hoac thao tac thu cong.
+      responses:
+        '200':
+          description: So don da duoc giai phong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  released: { type: integer, example: 3 }
+
+components:
+  parameters:
+    VenueId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    FieldId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+
+  responses:
+    NotFound:
+      description: Khong tim thay du lieu
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    DbUnavailable:
+      description: Khong ket noi duoc co so du lieu (`DB_UNAVAILABLE`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId, timestamp]
+          properties:
+            code:
+              type: string
+              description: Ma loi on dinh, client xu ly theo ma nay
+              enum:
+                - VALIDATION_ERROR
+                - MISSING_FIELD
+                - INVALID_TIME_RANGE
+                - CONSTRAINT_VIOLATED
+                - UNAUTHENTICATED
+                - FORBIDDEN
+                - NOT_FOUND
+                - VENUE_NOT_FOUND
+                - FIELD_NOT_FOUND
+                - BOOKING_NOT_FOUND
+                - ROUTE_NOT_FOUND
+                - SLOT_TAKEN
+                - VENUE_NOT_APPROVED
+                - NO_PRICE_RULE
+                - INVALID_STATUS
+                - HOLD_EXPIRED
+                - DB_UNAVAILABLE
+                - INTERNAL_ERROR
+            message:   { type: string, description: Cau thong bao tieng Viet cho nguoi dung }
+            details:   { type: object, description: Thong tin phu de debug hoac to mau o truong sai }
+            requestId: { type: string, description: Trung voi header X-Request-Id }
+            timestamp: { type: string, format: date-time }
+
+    District:
+      type: object
+      properties:
+        code: { type: string, example: CG }
+        name: { type: string, example: Cau Giay }
+
+    VenueSummary:
+      type: object
+      properties:
+        id:            { type: integer }
+        name:          { type: string, example: San Cau Giay Center }
+        address:       { type: string }
+        district_code: { type: string }
+        district_name: { type: string }
+        phone:         { type: string }
+        avg_rating:    { type: number, format: float, example: 4.6 }
+        rating_count:  { type: integer, example: 128 }
+        open_time:     { type: string, example: '05:00:00' }
+        close_time:    { type: string, example: '23:00:00' }
+        deposit_rate:  { type: number, format: float, example: 0.3 }
+        field_count:   { type: integer, example: 6 }
+        min_price:     { type: integer, description: Gia thap nhat moi gio, dong, example: 250000 }
+        amenities:
+          type: array
+          items: { type: string }
+          example: [Den, Cang tin]
+
+    VenueDetail:
+      allOf:
+        - $ref: '#/components/schemas/VenueSummary'
+        - type: object
+          properties:
+            fields:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:        { type: integer }
+                  name:      { type: string, example: San 7 so 1 }
+                  type:      { type: string, enum: [F5, F7, F11] }
+                  is_active: { type: boolean }
+            price_rules:
+              type: array
+              items:
+                type: object
+                properties:
+                  field_type:     { type: string }
+                  day_type:       { type: string, enum: [WEEKDAY, WEEKEND] }
+                  from_minute:    { type: integer, description: Phut tinh tu 00:00, example: 1170 }
+                  to_minute:      { type: integer, example: 1290 }
+                  base_price:     { type: integer }
+                  multiplier:     { type: number }
+                  label:          { type: string, example: Gio vang }
+                  price_per_hour: { type: integer }
+
+    Slot:
+      type: object
+      properties:
+        field_id:  { type: integer }
+        play_date: { type: string, format: date }
+        start_at:  { type: string, format: date-time }
+        end_at:    { type: string, format: date-time }
+        status:
+          type: string
+          enum: [AVAILABLE, HELD, BOOKED, BLOCKED]
+        price:     { type: integer }
+
+    CreateBookingRequest:
+      type: object
+      required: [field_id, play_date, start, end, user_id]
+      properties:
+        field_id:    { type: integer, example: 3 }
+        play_date:   { type: string, format: date, example: '2026-09-20' }
+        start:       { type: string, example: '19:30' }
+        end:         { type: string, example: '21:00' }
+        user_id:     { type: integer, description: Nguoi dat, bat buoc theo rang buoc ck_booking_owner }
+        guest_name:  { type: string, description: Thong tin lien he them, khong thay the user_id }
+        guest_phone: { type: string, example: '0912345678' }
+        note:        { type: string }
+
+    Booking:
+      type: object
+      properties:
+        id:              { type: integer }
+        code:            { type: string, example: BK260914A7K2M }
+        kind:            { type: string, enum: [SINGLE, RECURRING] }
+        status:
+          type: string
+          enum: [HELD, PENDING_VERIFY, CONFIRMED, COMPLETED, CANCELLED_BY_USER, CANCELLED_BY_OWNER, EXPIRED]
+        venue_id:        { type: integer }
+        user_id:         { type: integer }
+        total_amount:    { type: integer, example: 375000 }
+        deposit_amount:  { type: integer, example: 112500 }
+        hold_expires_at: { type: string, format: date-time }
+        hours:           { type: number, example: 1.5 }
+        slots:
+          type: array
+          items: { $ref: '#/components/schemas/Slot' }
+
+    BookingDetail:
+      allOf:
+        - $ref: '#/components/schemas/Booking'
+        - type: object
+          properties:
+            venue_name: { type: string }
+            payments:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:           { type: integer }
+                  method:       { type: string, enum: [VNPAY, TRANSFER, CASH, MOMO] }
+                  status:       { type: string, enum: [PENDING, SUCCESS, FAILED, REFUNDED] }
+                  amount:       { type: integer }
+                  provider_ref: { type: string }
+                  paid_at:      { type: string, format: date-time }

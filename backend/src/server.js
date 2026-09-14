@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const { waitForDb, pool } = require('./db');
-const { requestLogger, notFound, errorHandler } = require('./middlewares');
+const { requestId, requestLogger, notFound, errorHandler } = require('./middlewares');
 const routes = require('./routes');
 
 const app = express();
@@ -15,6 +15,7 @@ const ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
 
 app.use(cors({ origin: ORIGINS, credentials: true }));
 app.use(express.json());
+app.use(requestId);
 app.use(requestLogger);
 
 app.use('/', routes);

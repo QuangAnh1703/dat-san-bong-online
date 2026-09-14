@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { query } = require('../db');
+const { AppError } = require('../lib/errors');
 const router = express.Router();
 
 // GET /api/venues?district=CG&q=my dinh
@@ -37,7 +38,7 @@ router.get('/:id', async (req, res, next) => {
       `SELECT v.*, d.name AS district_name
          FROM venue v JOIN district d ON d.code = v.district_code
         WHERE v.id = $1`, [id]);
-    if (v.rowCount === 0) return res.status(404).json({ error: 'Khong tim thay san' });
+    if (v.rowCount === 0) throw new AppError('VENUE_NOT_FOUND', { details: { id } });
 
     const fields = await query(
       `SELECT id, name, type, is_active FROM field WHERE venue_id = $1 ORDER BY name`, [id]);

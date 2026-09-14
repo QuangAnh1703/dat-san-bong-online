@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { query, withTransaction } = require('../db');
+const { AppError, requireFields } = require('../lib/errors');
 const router = express.Router();
 
 const HOLD_MINUTES = Number(process.env.HOLD_MINUTES || 15);
@@ -16,26 +17,22 @@ function makeCode() {
 // body: { field_id, play_date, start, end, user_id? , guest_name?, guest_phone?, note? }
 router.post('/', async (req, res, next) => {
   const { field_id, play_date, start, end, user_id, guest_name, guest_phone, note } = req.body || {};
-  if (!field_id || !play_date || !start || !end) {
-    return res.status(400).json({ error: 'Can co field_id, play_date, start, end' });
-  }
-  // Rang buoc ck_booking_owner: don thuong bat buoc co user_id.
-  // guest_name/guest_phone chi la thong tin lien he them (vd. nhan vien dat ho).
-  if (!user_id) {
-    return res.status(400).json({ error: 'Can user_id (nguoi dat). guest_name/guest_phone chi la thong tin lien he them' });
-  }
 
   try {
+    // Rang buoc ck_booking_owner: don bat buoc co user_id.
+    // guest_name/guest_phone chi la thong tin lien he them (vd. nhan vien dat ho).
+    requireFields(req.body, ['field_id', 'play_date', 'start', 'end', 'user_id']);
+
     const out = await withTransaction(async (c) => {
       // 1. Lay san + loai san + venue
       const f = await c.query(
         `SELECT f.id, f.type, f.venue_id, v.deposit_rate, v.status AS venue_status
            FROM field f JOIN venue v ON v.id = f.venue_id
           WHERE f.id = $1 AND f.is_active`, [field_id]);
-      if (f.rowCount === 0) { const e = new Error('San khong ton tai hoac dang tam ngung'); e.status = 404; throw e; }
+      if (f.rowCount === 0) throw new AppError('FIELD_NOT_FOUND', { details: { field_id } });
       const field = f.rows[0];
       if (field.venue_status !== 'APPROVED') {
-        const e = new Error('Co so chua duoc duyet'); e.status = 409; throw e;
+        throw new AppError('VENUE_NOT_APPROVED', { details: { venue_id: field.venue_id } });
       }
 
       // 2. Tinh gia theo price_rule (base_price * multiplier * so gio)
@@ -59,7 +56,7 @@ router.post('/', async (req, res, next) => {
 
       const price = p.rows[0];
       if (!price || price.amount === null) {
-        const e = new Error('Chua co bang gia cho khung gio nay'); e.status = 409; throw e;
+        throw new AppError('NO_PRICE_RULE', { details: { play_date, start, end, field_type: field.type } });
       }
       const total = Number(price.amount);
       const deposit = Math.round(total * Number(field.deposit_rate));
@@ -89,14 +86,8 @@ router.post('/', async (req, res, next) => {
 
     res.status(201).json(out);
   } catch (err) {
-    // 23P01 = exclusion_violation -> khung gio da co nguoi dat
-    if (err.code === '23P01') {
-      return res.status(409).json({ error: 'Khung gio nay da co nguoi dat', code: err.code });
-    }
-    if (err.code === '23514') {
-      return res.status(400).json({ error: 'Du lieu vi pham rang buoc (thoi luong 1-4 gio, SDT 10 so...)', detail: err.constraint });
-    }
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    // Ma loi PostgreSQL (23P01 trung khung gio, 23514 vi pham check...)
+    // duoc errorHandler quy doi sang ma loi cua he thong.
     next(err);
   }
 });
@@ -108,7 +99,7 @@ router.get('/:code', async (req, res, next) => {
       `SELECT b.*, v.name AS venue_name
          FROM booking b JOIN venue v ON v.id = b.venue_id
         WHERE b.code = $1`, [req.params.code]);
-    if (b.rowCount === 0) return res.status(404).json({ error: 'Khong tim thay don' });
+    if (b.rowCount === 0) throw new AppError('BOOKING_NOT_FOUND', { details: { code: req.params.code } });
 
     const slots = await query(
       `SELECT bs.id, f.name AS field_name, bs.play_date,
@@ -130,9 +121,12 @@ router.post('/:code/cancel', async (req, res, next) => {
     const out = await withTransaction(async (c) => {
       const b = await c.query(
         `SELECT id, status FROM booking WHERE code = $1 FOR UPDATE`, [req.params.code]);
-      if (b.rowCount === 0) { const e = new Error('Khong tim thay don'); e.status = 404; throw e; }
+      if (b.rowCount === 0) throw new AppError('BOOKING_NOT_FOUND', { details: { code: req.params.code } });
       if (!['HELD', 'PENDING_VERIFY', 'CONFIRMED'].includes(b.rows[0].status)) {
-        const e = new Error(`Don dang o trang thai ${b.rows[0].status}, khong the huy`); e.status = 409; throw e;
+        throw new AppError('INVALID_STATUS', {
+          message: `Don dang o trang thai ${b.rows[0].status}, khong the huy`,
+          details: { status: b.rows[0].status, allowed: ['HELD', 'PENDING_VERIFY', 'CONFIRMED'] },
+        });
       }
       const id = b.rows[0].id;
       await c.query(
@@ -144,10 +138,7 @@ router.post('/:code/cancel', async (req, res, next) => {
       return { code: req.params.code, status: 'CANCELLED_BY_USER', released_slots: s.rowCount };
     });
     res.json(out);
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 // POST /api/bookings/release-expired  -> goi ham don don qua han

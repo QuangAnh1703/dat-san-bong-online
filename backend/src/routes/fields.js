@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { query } = require('../db');
+const { AppError, requireFields } = require('../lib/errors');
 const router = express.Router();
 
 // GET /api/fields/:id/schedule?date=2026-09-10
@@ -22,9 +23,7 @@ router.get('/:id/availability', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { date, start, end } = req.query;
-    if (!date || !start || !end) {
-      return res.status(400).json({ error: 'Thieu tham so date, start hoac end' });
-    }
+    requireFields(req.query, ['date', 'start', 'end']);
     const r = await query(
       `SELECT fn_is_slot_available($1, tstzrange(($2 || ' ' || $3)::timestamptz,
                                                  ($2 || ' ' || $4)::timestamptz, '[)')) AS available`,
