@@ -1,0 +1,12 @@
+.git
+**/node_modules
+frontend
+docs
+csdl/pgdata
+csdl/db/all_in_one.sql
+csdl/db/test_constraints.sql
+**/.env
+**/*.log
+.vscode
+.github
+*.md

@@ -46,7 +46,8 @@ services:
   # Chi chay khi them --profile app
   api:
     build:
-      context: ../api
+      context: ..
+      dockerfile: backend/Dockerfile
     container_name: sanbong-api
     restart: unless-stopped
     profiles: ["app"]
@@ -56,6 +57,11 @@ services:
       PORT: "3000"
       HOLD_MINUTES: "15"
       TZ: Asia/Ho_Chi_Minh
+      # Bi mat ky JWT - doi gia tri that khi trien khai thuc te
+      JWT_ACCESS_SECRET: doi-chuoi-bi-mat-that-dai-o-day
+      JWT_REFRESH_SECRET: doi-chuoi-bi-mat-khac-o-day
+      JWT_ACCESS_EXPIRES: 15m
+      JWT_REFRESH_EXPIRES: 7d
     ports:
       - "3000:3000"
     depends_on:
