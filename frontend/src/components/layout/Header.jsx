@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
-import { RegisterModal } from '../auth/RegisterModal';
+import { OtpRegisterModal } from '../auth/OtpRegisterModal';
 
 const NAV = [
   { to: '/', label: 'Tim san', end: true },
@@ -94,7 +94,7 @@ export default function Header() {
           setRegisterOpen(true);
         }}
       />
-      <RegisterModal
+      <OtpRegisterModal
         isOpen={registerOpen}
         onClose={() => setRegisterOpen(false)}
         onSwitchToLogin={() => {
