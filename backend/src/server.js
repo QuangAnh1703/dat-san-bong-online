@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const { waitForDb, pool } = require('./db');
 const { validate: validateSchema } = require('./db/migrate');
+const { connect: connectRedis } = require('./redis');
 const { requestId, requestLogger, notFound, errorHandler } = require('./middlewares');
 const routes = require('./routes');
 
@@ -28,6 +29,11 @@ const PORT = Number(process.env.PORT || 3000);
 
 (async () => {
   await waitForDb();
+  try {
+    await connectRedis();
+  } catch (err) {
+    console.warn('[redis] warning: %s (continue without Redis)', err.message);
+  }
   try {
     await validateSchema();
   } catch (err) {

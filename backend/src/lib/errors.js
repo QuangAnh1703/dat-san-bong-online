@@ -18,6 +18,9 @@ const ERRORS = {
   CONSTRAINT_VIOLATED:{ status: 400, message: 'Du lieu vi pham rang buoc nghiep vu' },
   INVALID_PHONE:      { status: 400, message: 'So dien thoai khong hop le (10 so, bat dau bang 0)' },
   WEAK_PASSWORD:      { status: 400, message: 'Mat khau phai co it nhat 6 ky tu' },
+  OTP_INVALID:        { status: 400, message: 'Ma OTP khong dung' },
+  OTP_EXPIRED:        { status: 400, message: 'Ma OTP da het han (15 phut)' },
+  INVALID_TEMP_TOKEN: { status: 400, message: 'Phuong thuc xac thuc khong hop le' },
 
   // --- 401 / 403 ---
   UNAUTHENTICATED:    { status: 401, message: 'Ban can dang nhap' },
@@ -38,6 +41,9 @@ const ERRORS = {
   NO_PRICE_RULE:      { status: 409, message: 'Chua co bang gia cho khung gio nay' },
   INVALID_STATUS:     { status: 409, message: 'Don dang o trang thai khong cho phep thao tac nay' },
   HOLD_EXPIRED:       { status: 409, message: 'Da qua thoi gian giu cho' },
+
+  // --- 429 Rate limit ---
+  OTP_RATE_LIMITED:   { status: 429, message: 'Da nhap sai qua nhieu lan. Vui long thu lai sau' },
 
   // --- 5xx ---
   DB_UNAVAILABLE:     { status: 503, message: 'Khong ket noi duoc co so du lieu' },

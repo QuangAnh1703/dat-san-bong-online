@@ -30,6 +30,21 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: sanbong-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - sanbong_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # Cong cu quan tri CSDL qua trinh duyet: http://localhost:8081
   # Dang nhap: System=PostgreSQL, Server=db, User=sanbong, Password=sanbong123, Database=sanbong
   adminer:
@@ -70,3 +85,4 @@ services:
 
 volumes:
   sanbong_data:
+  sanbong_redis:

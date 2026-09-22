@@ -124,6 +124,91 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /api/auth/request-otp:
+    post:
+      tags: [Xac thuc]
+      summary: Yeu cau ma OTP de dang ky
+      description: Gui OTP ve SMS (demo hien thi trong log). Con lai 15 phut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: '0912345678' }
+      responses:
+        '200':
+          description: OTP gui thanh cong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'OTP sent' }
+                  phone:   { type: string, example: '5678', description: '4 chu so cuoi cua SDT' }
+        '400':
+          description: SDT sai dinh dang hoac khong hop le
+        '409':
+          description: SDT da duoc dang ky (`PHONE_TAKEN`)
+        '429':
+          description: Nhap sai qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+
+  /api/auth/verify-otp:
+    post:
+      tags: [Xac thuc]
+      summary: Xac minh ma OTP
+      description: Neu dung, tra ve temp_token (hieu luc 10 phut) dung de dang ky.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string, example: '0912345678' }
+                otp:   { type: string, example: '123456', maxLength: 6 }
+      responses:
+        '200':
+          description: OTP dung, nhan temp_token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  temp_token: { type: string, description: 'Dung de /register-with-otp' }
+        '400':
+          description: OTP khong dung, het han, hoac temp token khong hop le
+        '429':
+          description: Nhap sai qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+
+  /api/auth/register-with-otp:
+    post:
+      tags: [Xac thuc]
+      summary: Dang ky sau khi xac minh OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [temp_token, password, full_name]
+              properties:
+                temp_token:     { type: string, description: 'Tu /verify-otp' }
+                password:       { type: string, minLength: 6, example: 'password123' }
+                full_name:      { type: string, example: 'Nguyen Van A' }
+                district_code:  { type: string, example: 'CG', nullable: true }
+      responses:
+        '201':
+          description: Tao tai khoan thanh cong, nhan JWT
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400':
+          description: Thieu truong, mat khau ngan, hoac temp token het han
+
   /api/venues:
     get:
       tags: [Cum san]
