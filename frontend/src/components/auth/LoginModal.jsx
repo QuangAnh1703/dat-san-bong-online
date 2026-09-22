@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import './AuthModal.css';
 
 export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,11 +16,11 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
     setLoading(true);
 
     try {
-      const res = await login({ phone, password });
+      const res = await login({ email, password });
       authLogin(res);
       onClose();
     } catch (err) {
-      setError(err.message || 'Dang nhap that bai');
+      setError(err.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
@@ -32,7 +32,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Dang nhap</h2>
+          <h2>Đăng nhập</h2>
           <button className="btn-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
@@ -40,25 +40,24 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
           {error && <div className="error-msg">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="login-phone">So dien thoai</label>
+            <label htmlFor="login-email">Email</label>
             <input
-              id="login-phone"
-              type="tel"
-              inputMode="numeric"
-              placeholder="0XXXXXXXXX"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              id="login-email"
+              type="email"
+              placeholder="your-email@gmail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="login-password">Mat khau</label>
+            <label htmlFor="login-password">Mật khẩu</label>
             <input
               id="login-password"
               type="password"
-              placeholder="Nhap mat khau"
+              placeholder="Nhập mật khẩu"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
@@ -67,12 +66,12 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
           </div>
 
           <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Dang xu ly...' : 'Dang nhap'}
+            {loading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
 
         <div className="auth-footer">
-          <p>Chua co tai khoan? <button className="link-btn" onClick={onSwitchToRegister}>Dang ky</button></p>
+          <p>Chưa có tài khoản? <button className="link-btn" onClick={onSwitchToRegister}>Đăng ký</button></p>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('crypto');
 const { client } = require('../../redis');
+const { sendOtpEmail } = require('../../services/email.service');
 
 const OTP_EXPIRY = 15 * 60; // 15 minutes
 const MAX_ATTEMPTS = 5;
@@ -16,33 +17,36 @@ function hashOtp(otp) {
   return crypto.createHash('sha256').update(otp).digest('hex');
 }
 
-/** Store OTP in Redis with attempt tracking */
-async function storeOtp(phone, purpose = 'REGISTER') {
+/** Store OTP in Redis with attempt tracking, send via email */
+async function storeOtp(email, purpose = 'REGISTER') {
   const otp = generateOtp();
   const hash = hashOtp(otp);
-  const key = `otp:${phone}:${purpose}`;
-  const attemptsKey = `otp:attempts:${phone}:${purpose}`;
+  const key = `otp:${email}:${purpose}`;
+  const attemptsKey = `otp:attempts:${email}:${purpose}`;
 
   // Check if locked out
-  const locked = await client.get(`otp:locked:${phone}:${purpose}`);
+  const locked = await client.get(`otp:locked:${email}:${purpose}`);
   if (locked) {
     throw new Error(`OTP_LOCKED_${Math.ceil(Number(locked))}s`);
   }
 
-  // Store OTP hash + plain OTP (for logging/demo only, remove in production)
+  // Store OTP hash
   await client.setEx(key, OTP_EXPIRY, hash);
   // Reset attempts counter
   await client.del(attemptsKey);
 
-  console.log(`[OTP] Generated for ${phone}: ${otp}`);
-  return otp;
+  // Send email
+  await sendOtpEmail(email, otp);
+  console.log(`[OTP] Sent to ${email}`);
+
+  return { email, message: 'OTP sent to email' };
 }
 
 /** Verify OTP and track failed attempts */
-async function verifyOtp(phone, otp, purpose = 'REGISTER') {
-  const key = `otp:${phone}:${purpose}`;
-  const attemptsKey = `otp:attempts:${phone}:${purpose}`;
-  const lockKey = `otp:locked:${phone}:${purpose}`;
+async function verifyOtp(email, otp, purpose = 'REGISTER') {
+  const key = `otp:${email}:${purpose}`;
+  const attemptsKey = `otp:attempts:${email}:${purpose}`;
+  const lockKey = `otp:locked:${email}:${purpose}`;
 
   // Check if locked
   const locked = await client.get(lockKey);

@@ -10,6 +10,14 @@ async function findByPhone(phone) {
   return r.rows[0] || null;
 }
 
+async function findByEmail(email) {
+  const r = await query(
+    `SELECT u.*, p.full_name, p.district_code, p.skill_level
+       FROM app_user u LEFT JOIN user_profile p ON p.user_id = u.id
+      WHERE LOWER(u.email) = LOWER($1)`, [email]);
+  return r.rows[0] || null;
+}
+
 async function findById(id) {
   const r = await query(
     `SELECT u.*, p.full_name, p.district_code, p.skill_level
@@ -18,7 +26,7 @@ async function findById(id) {
   return r.rows[0] || null;
 }
 
-/** Tao app_user + user_profile trong 1 giao dich */
+/** Tao app_user + user_profile trong 1 giao dich - dung phone */
 async function createUserWithProfile({ phone, passwordHash, fullName, districtCode }) {
   return withTransaction(async (c) => {
     const u = await c.query(
@@ -35,8 +43,25 @@ async function createUserWithProfile({ phone, passwordHash, fullName, districtCo
   });
 }
 
+/** Tao app_user + user_profile trong 1 giao dich - dung email */
+async function createUserWithEmail({ email, passwordHash, fullName, districtCode }) {
+  return withTransaction(async (c) => {
+    const u = await c.query(
+      `INSERT INTO app_user (email, password_hash) VALUES ($1, $2) RETURNING *`,
+      [email.toLowerCase(), passwordHash]);
+    const user = u.rows[0];
+
+    const p = await c.query(
+      `INSERT INTO user_profile (user_id, full_name, district_code)
+       VALUES ($1, $2, $3) RETURNING full_name, district_code, skill_level`,
+      [user.id, fullName, districtCode || null]);
+
+    return { ...user, ...p.rows[0] };
+  });
+}
+
 async function touchLastLogin(userId) {
   await query(`UPDATE app_user SET last_login_at = now() WHERE id = $1`, [userId]);
 }
 
-module.exports = { findByPhone, findById, createUserWithProfile, touchLastLogin };
+module.exports = { findByPhone, findByEmail, findById, createUserWithProfile, createUserWithEmail, touchLastLogin };

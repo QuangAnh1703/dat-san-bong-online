@@ -6,6 +6,7 @@ const cors = require('cors');
 const { waitForDb, pool } = require('./db');
 const { validate: validateSchema } = require('./db/migrate');
 const { connect: connectRedis } = require('./redis');
+const { initializeEmail } = require('./services/email.service');
 const { requestId, requestLogger, notFound, errorHandler } = require('./middlewares');
 const routes = require('./routes');
 
@@ -33,6 +34,13 @@ const PORT = Number(process.env.PORT || 3000);
     await connectRedis();
   } catch (err) {
     console.warn('[redis] warning: %s (continue without Redis)', err.message);
+  }
+  try {
+    await initializeEmail();
+  } catch (err) {
+    console.error('[email] error: %s', err.message);
+    console.error('[email] check GMAIL_USER and GMAIL_APP_PASSWORD in .env');
+    process.exit(1);
   }
   try {
     await validateSchema();

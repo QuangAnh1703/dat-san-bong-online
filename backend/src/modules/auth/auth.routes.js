@@ -2,50 +2,29 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { AppError, requireFields } = require('../../lib/errors');
-const { findByPhone, createUserWithProfile, touchLastLogin } = require('./user.repository');
+const { findByEmail, createUserWithEmail, touchLastLogin } = require('./user.repository');
 const { signAccessToken, signRefreshToken } = require('./token');
 const { storeOtp, verifyOtp } = require('./otp.service');
 
 const router = express.Router();
 
-// SDT Viet Nam: dung 10 chu so, bat dau bang 0 - khop CHECK ck_user_phone_format
-const PHONE_RE = /^0[0-9]{9}$/;
+// Email validation
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toSafeUser(user) {
   const { password_hash, ...safe } = user;
   return safe;
 }
 
-// POST /api/auth/register  body: { phone, password, full_name, district_code? }
-router.post('/register', async (req, res, next) => {
-  try {
-    const { phone, password, full_name, district_code } = req.body || {};
-    requireFields(req.body, ['phone', 'password', 'full_name']);
-
-    if (!PHONE_RE.test(phone)) throw new AppError('INVALID_PHONE');
-    if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
-
-    const existing = await findByPhone(phone);
-    if (existing) throw new AppError('PHONE_TAKEN');
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await createUserWithProfile({ phone, passwordHash, fullName: full_name, districtCode: district_code });
-
-    res.status(201).json({
-      access_token: signAccessToken(user),
-      refresh_token: signRefreshToken(user),
-      user: toSafeUser(user),
-    });
-  } catch (err) { next(err); }
-});
-
-// POST /api/auth/login  body: { phone, password }
+// POST /api/auth/login  body: { email, password }
 router.post('/login', async (req, res, next) => {
   try {
-    const { phone, password } = req.body || {};
-    requireFields(req.body, ['phone', 'password']);
+    const { email, password } = req.body || {};
+    requireFields(req.body, ['email', 'password']);
 
-    const user = await findByPhone(phone);
+    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+
+    const user = await findByEmail(email);
     const ok = user && await bcrypt.compare(password, user.password_hash);
     if (!ok) throw new AppError('INVALID_CREDENTIALS');
 
@@ -59,20 +38,20 @@ router.post('/login', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/auth/request-otp  body: { phone }
-// Request OTP for registration
+// POST /api/auth/request-otp  body: { email }
+// Request OTP for registration, OTP sent via email
 router.post('/request-otp', async (req, res, next) => {
   try {
-    const { phone } = req.body || {};
-    requireFields(req.body, ['phone']);
+    const { email } = req.body || {};
+    requireFields(req.body, ['email']);
 
-    if (!PHONE_RE.test(phone)) throw new AppError('INVALID_PHONE');
+    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
 
-    const existing = await findByPhone(phone);
-    if (existing) throw new AppError('PHONE_TAKEN');
+    const existing = await findByEmail(email);
+    if (existing) throw new AppError('EMAIL_TAKEN');
 
-    const otp = await storeOtp(phone, 'REGISTER');
-    res.json({ message: 'OTP sent', phone: phone.slice(-4) });
+    await storeOtp(email, 'REGISTER');
+    res.json({ message: 'OTP sent to email', email: email.replace(/.{1,}@/, '*@') });
   } catch (err) {
     if (err.message.startsWith('OTP_LOCKED')) {
       const seconds = err.message.split('_')[2];
@@ -83,19 +62,19 @@ router.post('/request-otp', async (req, res, next) => {
   }
 });
 
-// POST /api/auth/verify-otp  body: { phone, otp }
+// POST /api/auth/verify-otp  body: { email, otp }
 // Verify OTP - returns temp token valid for 10 minutes
 router.post('/verify-otp', async (req, res, next) => {
   try {
-    const { phone, otp } = req.body || {};
-    requireFields(req.body, ['phone', 'otp']);
+    const { email, otp } = req.body || {};
+    requireFields(req.body, ['email', 'otp']);
 
-    if (!PHONE_RE.test(phone)) throw new AppError('INVALID_PHONE');
+    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
 
-    await verifyOtp(phone, otp, 'REGISTER');
+    await verifyOtp(email, otp, 'REGISTER');
 
     // Return temp token (valid for 10 minutes to register)
-    const tempToken = Buffer.from(JSON.stringify({ phone, verified_at: Date.now() })).toString('base64');
+    const tempToken = Buffer.from(JSON.stringify({ email, verified_at: Date.now() })).toString('base64');
     res.json({ temp_token: tempToken });
   } catch (err) {
     if (err.message === 'OTP_EXPIRED') {
@@ -133,13 +112,13 @@ router.post('/register-with-otp', async (req, res, next) => {
       throw new AppError('INVALID_TEMP_TOKEN');
     }
 
-    const { phone } = verified;
-    const existing = await findByPhone(phone);
-    if (existing) throw new AppError('PHONE_TAKEN');
+    const { email } = verified;
+    const existing = await findByEmail(email);
+    if (existing) throw new AppError('EMAIL_TAKEN');
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await createUserWithProfile({
-      phone,
+    const user = await createUserWithEmail({
+      email,
       passwordHash,
       fullName: full_name,
       districtCode: district_code,

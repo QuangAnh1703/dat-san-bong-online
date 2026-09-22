@@ -1,24 +1,15 @@
 import { api, ApiError } from './api';
 
-export async function register({ phone, password, fullName, districtCode }) {
-  return api.post('/api/auth/register', {
-    phone,
-    password,
-    full_name: fullName,
-    district_code: districtCode,
-  });
+export async function login({ email, password }) {
+  return api.post('/api/auth/login', { email, password });
 }
 
-export async function login({ phone, password }) {
-  return api.post('/api/auth/login', { phone, password });
+export async function requestOtp({ email }) {
+  return api.post('/api/auth/request-otp', { email });
 }
 
-export async function requestOtp({ phone }) {
-  return api.post('/api/auth/request-otp', { phone });
-}
-
-export async function verifyOtp({ phone, otp }) {
-  return api.post('/api/auth/verify-otp', { phone, otp });
+export async function verifyOtp({ email, otp }) {
+  return api.post('/api/auth/verify-otp', { email, otp });
 }
 
 export async function registerWithOtp({ temp_token, password, full_name, district_code }) {
