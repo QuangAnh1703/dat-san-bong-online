@@ -30,7 +30,11 @@ router.post('/register', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await createUserWithProfile({ phone, passwordHash, fullName: full_name, districtCode: district_code });
 
-    res.status(201).json(toSafeUser(user));
+    res.status(201).json({
+      access_token: signAccessToken(user),
+      refresh_token: signRefreshToken(user),
+      user: toSafeUser(user),
+    });
   } catch (err) { next(err); }
 });
 
