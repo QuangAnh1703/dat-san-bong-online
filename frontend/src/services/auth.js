@@ -21,11 +21,11 @@ export async function verifyOtp({ phone, otp }) {
   return api.post('/api/auth/verify-otp', { phone, otp });
 }
 
-export async function registerWithOtp({ tempToken, password, fullName, districtCode }) {
+export async function registerWithOtp({ temp_token, password, full_name, district_code }) {
   return api.post('/api/auth/register-with-otp', {
-    temp_token: tempToken,
+    temp_token,
     password,
-    full_name: fullName,
-    district_code: districtCode,
+    full_name,
+    district_code,
   });
 }

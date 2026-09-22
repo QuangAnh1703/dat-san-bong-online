@@ -76,6 +76,7 @@ export function OtpRegisterModal({ isOpen, onClose, onSwitchToLogin }) {
         temp_token: tempToken,
         password,
         full_name: fullName,
+        district_code: undefined,
       });
       login(res);
       onClose();
