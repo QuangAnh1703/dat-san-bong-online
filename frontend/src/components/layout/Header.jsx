@@ -1,19 +1,22 @@
 import { useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { LoginModal } from '../auth/LoginModal';
-import { EmailOtpRegisterModal } from '../auth/EmailOtpRegisterModal';
 
-const NAV = [
+const PLAYER_NAV = [
   { to: '/', label: 'Tim san', end: true },
   { to: '/giao-huu', label: 'Giao luu & Ghep doi' },
   { to: '/lich-cua-toi', label: 'Lich cua toi' },
 ];
 
+const OWNER_NAV = [
+  { to: '/', label: 'Trang chu', end: true },
+  { to: '/chu-san', label: 'Quan ly san' },
+  { to: '/chu-san/doanh-thu', label: 'Doanh thu' },
+];
+
 export default function Header() {
+  const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [registerOpen, setRegisterOpen] = useState(false);
   const { user, logout } = useAuth();
 
   const getInitials = (name) => {
@@ -32,7 +35,7 @@ export default function Header() {
 
           <div className="hact">
             {!user && (
-              <button className="btn-ghost" type="button" onClick={() => setLoginOpen(true)}>
+              <button className="btn-ghost" type="button" onClick={() => navigate('/auth/register')}>
                 Dang ky san
               </button>
             )}
@@ -46,7 +49,7 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              <button className="avatar" type="button" onClick={() => setLoginOpen(true)} title="Dang nhap">
+              <button className="avatar" type="button" onClick={() => navigate('/auth/login')} title="Dang nhap">
                 ?
               </button>
             )}
@@ -71,7 +74,7 @@ export default function Header() {
           </div>
 
           <nav className={`main${navOpen ? ' is-open' : ''}`} id="main-nav">
-            {NAV.map((item) => (
+            {(user?.role === 'OWNER' ? OWNER_NAV : PLAYER_NAV).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -86,22 +89,6 @@ export default function Header() {
         </div>
       </header>
 
-      <LoginModal
-        isOpen={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        onSwitchToRegister={() => {
-          setLoginOpen(false);
-          setRegisterOpen(true);
-        }}
-      />
-      <EmailOtpRegisterModal
-        isOpen={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-        onSwitchToLogin={() => {
-          setRegisterOpen(false);
-          setLoginOpen(true);
-        }}
-      />
     </>
   );
 }

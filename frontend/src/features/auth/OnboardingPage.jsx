@@ -36,6 +36,8 @@ export function OnboardingPage() {
     e?.preventDefault();
     setError('');
 
+    const isOwner = user?.role === 'OWNER';
+
     // Validation
     if (currentStep === STEPS.PROFILE) {
       if (!fullName.trim()) {
@@ -46,7 +48,9 @@ export function OnboardingPage() {
         setError('Họ tên không quá 120 ký tự');
         return;
       }
-      setCurrentStep(STEPS.SKILL);
+      // OWNER: skip SKILL step, go straight to AVATAR
+      // PLAYER: go to SKILL step
+      setCurrentStep(isOwner ? STEPS.AVATAR : STEPS.SKILL);
     } else if (currentStep === STEPS.SKILL) {
       setCurrentStep(STEPS.POSITION);
     } else if (currentStep === STEPS.POSITION) {
@@ -99,7 +103,12 @@ export function OnboardingPage() {
   };
 
   const getProgress = () => {
-    const steps = [STEPS.PROFILE, STEPS.SKILL, STEPS.POSITION, STEPS.AVATAR];
+    const isOwner = user?.role === 'OWNER';
+    // OWNER: PROFILE -> AVATAR (2 steps)
+    // PLAYER: PROFILE -> SKILL -> POSITION -> AVATAR (4 steps)
+    const steps = isOwner
+      ? [STEPS.PROFILE, STEPS.AVATAR]
+      : [STEPS.PROFILE, STEPS.SKILL, STEPS.POSITION, STEPS.AVATAR];
     return ((steps.indexOf(currentStep) + 1) / steps.length) * 100;
   };
 
@@ -237,6 +246,19 @@ export function OnboardingPage() {
             {/* Step 4: Avatar & Bio */}
             {currentStep === STEPS.AVATAR && (
               <form onSubmit={handleNext} className="onboarding-form">
+                {user?.role === 'OWNER' && (
+                  <div className="form-group">
+                    <label htmlFor="district">Quận/huyện (nơi đặt sân)</label>
+                    <input
+                      id="district"
+                      type="text"
+                      placeholder="Nhập mã quận (VD: Q1, Q2)"
+                      value={districtCode}
+                      onChange={(e) => setDistrictCode(e.target.value.toUpperCase())}
+                    />
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label htmlFor="bio">Về bạn (tùy chọn)</label>
                   <textarea
@@ -268,7 +290,9 @@ export function OnboardingPage() {
                   <button
                     type="button"
                     className="btn-secondary"
-                    onClick={() => setCurrentStep(STEPS.POSITION)}
+                    onClick={() => setCurrentStep(
+                      user?.role === 'OWNER' ? STEPS.PROFILE : STEPS.POSITION
+                    )}
                   >
                     ← Quay lại
                   </button>

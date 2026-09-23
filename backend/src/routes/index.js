@@ -79,6 +79,7 @@ router.get('/docs', (_req, res) => {
 
 router.use('/api/auth', require('../modules/auth/auth.routes'));
 router.use('/api/profile', require('../modules/profile/profile.routes'));
+router.use('/api/owner', require('../modules/owner/owner.routes'));
 router.use('/api/admin', require('../modules/admin/admin.routes'));
 router.use('/api/venues', require('../modules/venues/venues.routes'));
 router.use('/api/fields', require('../modules/venues/fields.routes'));

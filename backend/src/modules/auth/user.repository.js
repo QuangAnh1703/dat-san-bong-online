@@ -27,11 +27,11 @@ async function findById(id) {
 }
 
 /** Tao app_user + user_profile trong 1 giao dich - dung phone */
-async function createUserWithProfile({ phone, passwordHash, fullName, districtCode }) {
+async function createUserWithProfile({ phone, passwordHash, fullName, districtCode, role = 'PLAYER' }) {
   return withTransaction(async (c) => {
     const u = await c.query(
-      `INSERT INTO app_user (phone, password_hash) VALUES ($1, $2) RETURNING *`,
-      [phone, passwordHash]);
+      `INSERT INTO app_user (phone, password_hash, role) VALUES ($1, $2, $3) RETURNING *`,
+      [phone, passwordHash, role]);
     const user = u.rows[0];
 
     const p = await c.query(
@@ -44,11 +44,11 @@ async function createUserWithProfile({ phone, passwordHash, fullName, districtCo
 }
 
 /** Tao app_user + user_profile trong 1 giao dich - dung email */
-async function createUserWithEmail({ email, passwordHash, fullName, districtCode }) {
+async function createUserWithEmail({ email, passwordHash, fullName, districtCode, role = 'PLAYER' }) {
   return withTransaction(async (c) => {
     const u = await c.query(
-      `INSERT INTO app_user (email, password_hash) VALUES ($1, $2) RETURNING *`,
-      [email.toLowerCase(), passwordHash]);
+      `INSERT INTO app_user (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *`,
+      [email.toLowerCase(), passwordHash, role]);
     const user = u.rows[0];
 
     const p = await c.query(
@@ -65,11 +65,11 @@ async function touchLastLogin(userId) {
 }
 
 /** Tao app_user + user_profile + oauth_account trong 1 giao dich */
-async function createUserWithOAuth({ email, fullName, provider, providerId }) {
+async function createUserWithOAuth({ email, fullName, provider, providerId, role = 'PLAYER' }) {
   return withTransaction(async (c) => {
     const u = await c.query(
-      `INSERT INTO app_user (email) VALUES ($1) RETURNING *`,
-      [email.toLowerCase()]);
+      `INSERT INTO app_user (email, role) VALUES ($1, $2) RETURNING *`,
+      [email.toLowerCase(), role]);
     const user = u.rows[0];
 
     await c.query(

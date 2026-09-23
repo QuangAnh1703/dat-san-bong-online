@@ -1,0 +1,376 @@
+/* Single Column Auth Layout */
+.container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Form Section */
+.formSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.formCard {
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  border-radius: 8px;
+  padding: 40px 32px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.formHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.formHeader h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.formHeader p {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0;
+}
+
+.error {
+  background: #fce4e6;
+  border-left: 4px solid #e53935;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.typeToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.typeBtn {
+  padding: 10px 16px;
+  border: 2px solid #dadce0;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #5f6368;
+  transition: all 0.2s;
+}
+
+.typeBtn:hover {
+  border-color: #1f71b8;
+  color: #1f71b8;
+}
+
+.typeBtn.active {
+  background: #1f71b8;
+  color: white;
+  border-color: #1f71b8;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroup label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.formGroup input,
+.formGroup select {
+  padding: 12px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: #1f71b8;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(31, 113, 184, 0.15);
+}
+
+.formGroup input:disabled,
+.formGroup select:disabled {
+  background: #f5f5f5;
+  color: #9aa0a6;
+  cursor: not-allowed;
+}
+
+.submitBtn {
+  padding: 12px 16px;
+  background: #1f71b8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: #1765a0;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.submitBtn:active:not(:disabled) {
+  background: #1458a5;
+}
+
+.submitBtn:disabled {
+  background: #dadce0;
+  color: #80868b;
+  cursor: not-allowed;
+}
+
+.divider {
+  text-align: center;
+  margin: 24px 0;
+  font-size: 14px;
+  color: #5f6368;
+  position: relative;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #dadce0;
+  z-index: 0;
+}
+
+.divider {
+  background: white;
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.googleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: white;
+  color: #3c4043;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 24px;
+}
+
+.googleBtn:hover {
+  background: #f8f9fa;
+  border-color: #c6c6c6;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.googleBtn span {
+  font-size: 18px;
+}
+
+.info {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #5f6368;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.switchBtn {
+  background: none;
+  border: none;
+  color: #1f71b8;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.switchBtn:hover {
+  text-decoration: underline;
+}
+
+.switchBtn:disabled {
+  color: #9aa0a6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* Right: OAuth Section */
+.oauthSection {
+  display: none;
+}
+
+.oauthCard {
+  width: 100%;
+  max-width: 400px;
+  background: white;
+  border-radius: 12px;
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.oauthHeader {
+  margin-bottom: 32px;
+}
+
+.googleLogo {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.oauthHeader h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.oauthHeader p {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0;
+}
+
+.oauthBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+  margin-bottom: 24px;
+}
+
+.oauthBtn:hover {
+  background: #357ae8;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(66, 133, 244, 0.3);
+}
+
+.oauthBtn span {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.oauthFooter {
+  font-size: 13px;
+  color: #5f6368;
+  padding-top: 24px;
+  border-top: 1px solid #dadce0;
+}
+
+.oauthFooter p {
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .formSection {
+    padding: 20px;
+  }
+
+  .formCard {
+    padding: 32px 24px;
+  }
+
+  .formHeader h1 {
+    font-size: 24px;
+  }
+
+  .typeToggle {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .typeBtn {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0;
+  }
+
+  .formSection {
+    padding: 20px 16px;
+  }
+
+  .oauthCard {
+    padding: 32px 24px;
+  }
+
+  .formHeader h1 {
+    font-size: 20px;
+  }
+
+  .formHeader p {
+    font-size: 12px;
+  }
+
+  .submitBtn,
+  .googleBtn {
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+}

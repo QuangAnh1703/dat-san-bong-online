@@ -12,8 +12,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: sanbong
-      POSTGRES_USER: sanbong
-      POSTGRES_PASSWORD: sanbong123
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       TZ: Asia/Ho_Chi_Minh
       PGTZ: Asia/Ho_Chi_Minh
     ports:
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   # Cong cu quan tri CSDL qua trinh duyet: http://localhost:8081
-  # Dang nhap: System=PostgreSQL, Server=db, User=sanbong, Password=sanbong123, Database=sanbong
+  # Dang nhap: System=PostgreSQL, Server=db, User=postgres, Password=postgres, Database=sanbong
   adminer:
     image: adminer:4
     container_name: sanbong-adminer
@@ -68,7 +68,7 @@ services:
     profiles: ["app"]
     environment:
       # Trong mang Docker, host CSDL la ten service "db", khong phai localhost
-      DATABASE_URL: postgresql://sanbong:sanbong123@db:5432/sanbong
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sanbong
       PORT: "3000"
       HOLD_MINUTES: "15"
       TZ: Asia/Ho_Chi_Minh

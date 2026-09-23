@@ -1,7 +1,11 @@
 import { api, ApiError } from './api';
 
-export async function login({ email, password }) {
-  return api.post('/api/auth/login', { email, password });
+export async function login({ email, phone_number, password }) {
+  return api.post('/api/auth/login', {
+    ...(email && { email }),
+    ...(phone_number && { phone_number }),
+    password,
+  });
 }
 
 export async function requestOtp({ email }) {
@@ -12,18 +16,31 @@ export async function verifyOtp({ email, otp }) {
   return api.post('/api/auth/verify-otp', { email, otp });
 }
 
-export async function registerWithOtp({ temp_token, password, full_name, district_code }) {
+export async function registerWithOtp({ temp_token, password, full_name, district_code, role = 'PLAYER' }) {
   return api.post('/api/auth/register-with-otp', {
     temp_token,
     password,
     full_name,
     district_code,
+    role,
   });
 }
 
 export function getGoogleLoginUrl() {
   const base = import.meta.env.VITE_API_URL || '';
   return `${base}/api/auth/google`;
+}
+
+export async function forgotPassword({ email }) {
+  return api.post('/api/auth/forgot-password', { email });
+}
+
+export async function verifyResetOtp({ email, otp }) {
+  return api.post('/api/auth/verify-reset-otp', { email, otp });
+}
+
+export async function resetPassword({ temp_token, password }) {
+  return api.post('/api/auth/reset-password', { temp_token, password });
 }
 
 export function handleGoogleCallback(params) {

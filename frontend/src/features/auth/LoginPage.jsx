@@ -71,7 +71,7 @@ export function LoginPage() {
               required
               disabled={loading}
             />
-            <Link to="/auth/forgot-password" className={styles.link} style={{ fontSize: '0.875rem', marginTop: '0.5rem', display: 'block' }}>
+            <Link to="/auth/forgot-password" className={styles.forgotPasswordLink}>
               Quên mật khẩu?
             </Link>
           </div>

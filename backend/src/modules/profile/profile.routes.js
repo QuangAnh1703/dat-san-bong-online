@@ -6,7 +6,50 @@ const { query, withTransaction } = require('../../db');
 
 const router = express.Router();
 
-// All profile routes require authentication
+// GET /api/profile/:userId - View public profile (without auth) - PHẢI ĐẶT TRƯỚC
+router.get('/:userId', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    if (!Number.isInteger(Number(userId))) {
+      return next(new AppError('INVALID_FIELD', {
+        details: { field: 'userId', reason: 'Must be number' }
+      }));
+    }
+
+    const r = await query(
+      `SELECT u.id, u.role, u.status,
+              p.full_name, p.avatar_url, p.district_code, p.skill_level,
+              p.preferred_position, p.reputation_score, p.total_matches, p.bio, p.updated_at
+       FROM app_user u
+       LEFT JOIN user_profile p ON p.user_id = u.id
+       WHERE u.id = $1 AND u.status = 'ACTIVE'`,
+      [userId]
+    );
+
+    if (r.rowCount === 0) {
+      return next(new AppError('USER_NOT_FOUND'));
+    }
+
+    const user = r.rows[0];
+    res.json({
+      id: user.id,
+      role: user.role,
+      fullName: user.full_name,
+      avatarUrl: user.avatar_url,
+      districtCode: user.district_code,
+      skillLevel: user.skill_level,
+      preferredPosition: user.preferred_position,
+      reputationScore: user.reputation_score,
+      totalMatches: user.total_matches,
+      bio: user.bio,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Từ đây trở đi yêu cầu authentication
 router.use(requireAuthenticated);
 
 // GET /api/profile - Get current user profile
@@ -241,49 +284,6 @@ router.post('/avatar', async (req, res, next) => {
       message: 'Avatar updated',
       avatar_url: result.rows[0]?.avatar_url,
       updated_at: result.rows[0]?.updated_at,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/profile/:userId - View public profile (without auth)
-router.get('/:userId', async (req, res, next) => {
-  try {
-    const { userId } = req.params;
-
-    if (!Number.isInteger(Number(userId))) {
-      return next(new AppError('INVALID_FIELD', {
-        details: { field: 'userId', reason: 'Must be number' }
-      }));
-    }
-
-    const r = await query(
-      `SELECT u.id, u.role, u.status,
-              p.full_name, p.avatar_url, p.district_code, p.skill_level,
-              p.preferred_position, p.reputation_score, p.total_matches, p.bio, p.updated_at
-       FROM app_user u
-       LEFT JOIN user_profile p ON p.user_id = u.id
-       WHERE u.id = $1 AND u.status = 'ACTIVE'`,
-      [userId]
-    );
-
-    if (r.rowCount === 0) {
-      return next(new AppError('USER_NOT_FOUND'));
-    }
-
-    const user = r.rows[0];
-    res.json({
-      id: user.id,
-      role: user.role,
-      fullName: user.full_name,
-      avatarUrl: user.avatar_url,
-      districtCode: user.district_code,
-      skillLevel: user.skill_level,
-      preferredPosition: user.preferred_position,
-      reputationScore: user.reputation_score,
-      totalMatches: user.total_matches,
-      bio: user.bio,
     });
   } catch (err) {
     next(err);

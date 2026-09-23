@@ -74,12 +74,25 @@ const permissions = {
   'GET /api/community/posts': ['PLAYER', 'OWNER', 'ADMIN'],
   'POST /api/community/posts/:id/match': ['PLAYER', 'OWNER', 'ADMIN'],
 
+  // Profile - All authenticated users
+  'GET /api/profile': ['PLAYER', 'OWNER', 'ADMIN'],
+  'PUT /api/profile': ['PLAYER', 'OWNER', 'ADMIN'],
+  'POST /api/profile/avatar': ['PLAYER', 'OWNER', 'ADMIN'],
+
+  // Owner requests - PLAYER can request
+  'POST /api/owner/request': ['PLAYER'],
+  'GET /api/owner/me': ['PLAYER', 'OWNER', 'ADMIN'],
+
   // Admin only
-  'GET /api/admin/users': ['ADMIN'],
-  'PUT /api/admin/users/:id/role': ['ADMIN'],
+  'GET /api/admin/venues/pending': ['ADMIN'],
   'POST /api/admin/venues/:id/approve': ['ADMIN'],
   'POST /api/admin/venues/:id/reject': ['ADMIN'],
-  'GET /api/admin/analytics': ['ADMIN'],
+  'GET /api/admin/stats': ['ADMIN'],
+  'GET /api/admin/users': ['ADMIN'],
+  'PUT /api/admin/users/:id/role': ['ADMIN'],
+  'GET /api/admin/owner-requests': ['ADMIN'],
+  'POST /api/admin/owner-requests/:id/approve': ['ADMIN'],
+  'POST /api/admin/owner-requests/:id/reject': ['ADMIN'],
 };
 
 /**

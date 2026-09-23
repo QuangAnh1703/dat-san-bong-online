@@ -1,4 +1,5 @@
 'use strict';
+require('dotenv').config();
 const { Pool } = require('pg');
 
 // Tra ve DECIMAL/NUMERIC duoi dang so thay vi chuoi

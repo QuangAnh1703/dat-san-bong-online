@@ -31,7 +31,13 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('auth_user');
   };
 
-  const value = { user, token, loading, login, logout };
+  const updateProfile = (profileData) => {
+    const updated = { ...user, ...profileData };
+    setUser(updated);
+    localStorage.setItem('auth_user', JSON.stringify(updated));
+  };
+
+  const value = { user, token, loading, login, logout, updateProfile };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
