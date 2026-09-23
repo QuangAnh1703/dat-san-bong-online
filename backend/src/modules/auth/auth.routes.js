@@ -1,12 +1,17 @@
 'use strict';
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const passport = require('passport');
 const { AppError, requireFields } = require('../../lib/errors');
 const { findByEmail, createUserWithEmail, touchLastLogin } = require('./user.repository');
 const { signAccessToken, signRefreshToken } = require('./token');
 const { storeOtp, verifyOtp } = require('./otp.service');
+const { initGoogleOAuth } = require('./google-oauth.service');
 
 const router = express.Router();
+
+// Initialize Google OAuth
+initGoogleOAuth();
 
 // Email validation
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -130,6 +135,45 @@ router.post('/register-with-otp', async (req, res, next) => {
       user: toSafeUser(user),
     });
   } catch (err) { next(err); }
+});
+
+// GET /api/auth/google - Redirect to Google OAuth
+// Frontend should redirect to this endpoint to start Google login
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+// GET /api/auth/google/callback - Handle Google OAuth callback
+router.get('/google/callback', passport.authenticate('google', { session: false }), async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) throw new AppError('GOOGLE_LOGIN_FAILED');
+
+    await touchLastLogin(user.id);
+
+    // Generate tokens
+    const safeUser = toSafeUser(user);
+    const tokens = {
+      access_token: signAccessToken(user),
+      refresh_token: signRefreshToken(user),
+      user: safeUser,
+    };
+
+    // Redirect to frontend with tokens in URL
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const params = new URLSearchParams();
+    params.set('access_token', tokens.access_token);
+    params.set('refresh_token', tokens.refresh_token);
+    params.set('user', JSON.stringify(tokens.user));
+
+    res.redirect(`${frontendUrl}/auth/google-callback?${params.toString()}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/google/logout
+router.post('/google/logout', (req, res) => {
+  // Invalidate token on client side; server-side sessions handled by client
+  res.json({ message: 'Logged out' });
 });
 
 module.exports = router;

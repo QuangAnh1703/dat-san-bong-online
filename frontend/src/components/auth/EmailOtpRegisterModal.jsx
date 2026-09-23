@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { requestOtp, verifyOtp, registerWithOtp } from '../../services/auth';
+import { requestOtp, verifyOtp, registerWithOtp, getGoogleLoginUrl } from '../../services/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import './AuthModal.css';
 
@@ -96,6 +96,10 @@ export function EmailOtpRegisterModal({ isOpen, onClose, onSwitchToLogin }) {
       setStep(STEPS.OTP);
       setError('');
     }
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = getGoogleLoginUrl();
   };
 
   return (
@@ -234,6 +238,33 @@ export function EmailOtpRegisterModal({ isOpen, onClose, onSwitchToLogin }) {
             </button>
           </form>
         )}
+
+        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+          <p style={{ textAlign: 'center', marginBottom: '12px', fontSize: '12px', color: 'var(--text-2)' }}>Hoặc</p>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'white',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              fontWeight: 500,
+              fontSize: '14px',
+            }}
+          >
+            <span>🔐</span>
+            <span>Đăng ký với Google</span>
+          </button>
+        </div>
 
         <div className="auth-footer">
           <p>Đã có tài khoản? <button className="link-btn" onClick={onSwitchToLogin}>Đăng nhập</button></p>

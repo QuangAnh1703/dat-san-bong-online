@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { login } from '../../services/auth';
+import { login, getGoogleLoginUrl } from '../../services/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import './AuthModal.css';
 
@@ -24,6 +24,10 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = getGoogleLoginUrl();
   };
 
   if (!isOpen) return null;
@@ -69,6 +73,33 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }) {
             {loading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
+
+        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+          <p style={{ textAlign: 'center', marginBottom: '12px', fontSize: '12px', color: 'var(--text-2)' }}>Hoặc</p>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'white',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              fontWeight: 500,
+              fontSize: '14px',
+            }}
+          >
+            <span>🔐</span>
+            <span>Đăng nhập với Google</span>
+          </button>
+        </div>
 
         <div className="auth-footer">
           <p>Chưa có tài khoản? <button className="link-btn" onClick={onSwitchToRegister}>Đăng ký</button></p>

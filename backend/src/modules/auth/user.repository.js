@@ -64,4 +64,46 @@ async function touchLastLogin(userId) {
   await query(`UPDATE app_user SET last_login_at = now() WHERE id = $1`, [userId]);
 }
 
-module.exports = { findByPhone, findByEmail, findById, createUserWithProfile, createUserWithEmail, touchLastLogin };
+/** Tao app_user + user_profile + oauth_account trong 1 giao dich */
+async function createUserWithOAuth({ email, fullName, provider, providerId }) {
+  return withTransaction(async (c) => {
+    const u = await c.query(
+      `INSERT INTO app_user (email) VALUES ($1) RETURNING *`,
+      [email.toLowerCase()]);
+    const user = u.rows[0];
+
+    await c.query(
+      `INSERT INTO user_profile (user_id, full_name)
+       VALUES ($1, $2)`,
+      [user.id, fullName]);
+
+    await c.query(
+      `INSERT INTO oauth_account (user_id, provider, provider_uid)
+       VALUES ($1, $2, $3)`,
+      [user.id, provider, providerId]);
+
+    const p = await c.query(
+      `SELECT full_name, district_code, skill_level FROM user_profile WHERE user_id = $1`,
+      [user.id]);
+
+    return { ...user, ...p.rows[0] };
+  });
+}
+
+/** Them OAuth account vao user co san */
+async function linkOAuthAccount(userId, provider, providerId) {
+  await query(
+    `INSERT INTO oauth_account (user_id, provider, provider_uid)
+     VALUES ($1, $2, $3)`,
+    [userId, provider, providerId]);
+}
+
+/** Kiem tra xem user da co OAuth account chua */
+async function findOAuthAccount(userId, provider, providerId) {
+  const r = await query(
+    `SELECT * FROM oauth_account WHERE user_id = $1 AND provider = $2 AND provider_uid = $3`,
+    [userId, provider, providerId]);
+  return r.rows[0] || null;
+}
+
+module.exports = { findByPhone, findByEmail, findById, createUserWithProfile, createUserWithEmail, touchLastLogin, createUserWithOAuth, linkOAuthAccount, findOAuthAccount };

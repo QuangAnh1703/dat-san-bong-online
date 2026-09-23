@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const passport = require('passport');
 
 const { waitForDb, pool } = require('./db');
 const { validate: validateSchema } = require('./db/migrate');
@@ -18,6 +19,7 @@ const ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
 
 app.use(cors({ origin: ORIGINS, credentials: true }));
 app.use(express.json());
+app.use(passport.initialize());
 app.use(requestId);
 app.use(requestLogger);
 
