@@ -22,7 +22,8 @@ export async function registerWithOtp({ temp_token, password, full_name, distric
 }
 
 export function getGoogleLoginUrl() {
-  return `${api.defaults.baseURL}/api/auth/google`;
+  const base = import.meta.env.VITE_API_URL || '';
+  return `${base}/api/auth/google`;
 }
 
 export function handleGoogleCallback(params) {
