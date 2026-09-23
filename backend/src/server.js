@@ -9,6 +9,8 @@ const { validate: validateSchema } = require('./db/migrate');
 const { connect: connectRedis } = require('./redis');
 const { initializeEmail } = require('./services/email.service');
 const { requestId, requestLogger, notFound, errorHandler } = require('./middlewares');
+const { verifyAccessToken, requireAuthenticated } = require('./middlewares/auth');
+const { checkPermission } = require('./middlewares/rbac');
 const routes = require('./routes');
 
 const app = express();
@@ -22,6 +24,8 @@ app.use(express.json());
 app.use(passport.initialize());
 app.use(requestId);
 app.use(requestLogger);
+app.use(verifyAccessToken);
+app.use(checkPermission());
 
 app.use('/', routes);
 
