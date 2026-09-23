@@ -148,40 +148,242 @@ router.get('/google', (req, res, next) => {
   if (!hasRealConfig && isDev) {
     return res.type('html').send(`
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Mock Google Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in with Google - SanBong.vn</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-    .card { background: white; padding: 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
-    h1 { margin: 0 0 24px; font-size: 20px; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
-    input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
-    button { width: 100%; padding: 10px; background: #4285f4; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
-    button:hover { background: #3367d6; }
-    .info { background: #e8f0fe; padding: 12px; border-radius: 4px; margin-bottom: 24px; font-size: 12px; color: #1f2937; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 450px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+      padding: 40px 32px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .google-logo {
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 24px;
+      color: #202124;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #5f6368;
+    }
+    .dev-badge {
+      display: inline-block;
+      background: #fef7e0;
+      color: #9c6c00;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      border-left: 3px solid #f9ab00;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      color: #202124;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    input {
+      width: 100%;
+      padding: 12px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 16px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    input:focus {
+      outline: none;
+      border-color: #1f71b8;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.04), 0 2px 4px rgba(31,113,184,0.15);
+    }
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    button {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .btn-cancel {
+      background: white;
+      color: #3c4043;
+    }
+    .btn-cancel:hover {
+      background: #f8f9fa;
+      border-color: #c6c6c6;
+    }
+    .btn-submit {
+      background: #1f71b8;
+      color: white;
+      border-color: #1f71b8;
+    }
+    .btn-submit:hover {
+      background: #1765a0;
+      border-color: #1765a0;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.12);
+    }
+    .btn-submit:active {
+      background: #1458a5;
+    }
+    .info-box {
+      background: #e8f0fe;
+      border-left: 4px solid #4285f4;
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #1f2937;
+      line-height: 1.5;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #dadce0;
+      font-size: 12px;
+      color: #5f6368;
+    }
+    .footer a {
+      color: #1f71b8;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>🔐 Mock Google Login</h1>
-    <div class="info">
-      Development mode - use any email to test
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="google-logo">🔐</div>
+        <h1>Sign in with Google</h1>
+        <p>for SanBong.vn</p>
+      </div>
+
+      <div class="dev-badge">⚙️ Development Mode (Mock)</div>
+
+      <div class="info-box">
+        <strong>Testing Google OAuth</strong><br>
+        Use any email address to test the registration and login flow.
+      </div>
+
+      <form method="get" action="/api/auth/google/callback" onsubmit="return validateForm()">
+        <div class="form-group">
+          <label for="email">Email or phone</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@example.com"
+            value="testuser@gmail.com"
+            required
+            autofocus
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="name">Full name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            placeholder="Your name"
+            value="Test User"
+            required
+          >
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" onclick="window.history.back()">Cancel</button>
+          <button type="submit" class="btn-submit">Continue</button>
+        </div>
+      </form>
+
+      <div class="footer">
+        <p>
+          <a href="javascript:void(0)" onclick="showHelp()">Need help?</a> ·
+          <a href="javascript:void(0)" onclick="showPrivacy()">Privacy</a> ·
+          <a href="javascript:void(0)" onclick="showTerms()">Terms</a>
+        </p>
+      </div>
     </div>
-    <form method="get" action="/api/auth/google/callback">
-      <div class="form-group">
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" value="testuser@gmail.com" required>
-      </div>
-      <div class="form-group">
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" value="Test User" required>
-      </div>
-      <button type="submit">🔗 Login with Mock Google</button>
-    </form>
   </div>
+
+  <script>
+    function validateForm() {
+      const email = document.getElementById('email').value.trim();
+      const name = document.getElementById('name').value.trim();
+
+      if (!email || !name) {
+        alert('Please fill in all fields');
+        return false;
+      }
+
+      if (!email.includes('@')) {
+        alert('Please enter a valid email');
+        return false;
+      }
+
+      return true;
+    }
+
+    function showHelp() {
+      alert('This is a mock Google login for development testing.\\n\\n' +
+            'Use any email and name to test the flow.\\n' +
+            'No real Google account is needed.');
+    }
+
+    function showPrivacy() {
+      alert('Privacy Policy: This mock login is for development only.');
+    }
+
+    function showTerms() {
+      alert('Terms of Service: This mock login is for development testing.');
+    }
+
+    // Auto-focus email field
+    document.getElementById('email').focus();
+  </script>
 </body>
 </html>
     `);
