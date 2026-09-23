@@ -157,7 +157,7 @@ router.get('/google', (req, res, next) => {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #f5f5f5;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -171,7 +171,7 @@ router.get('/google', (req, res, next) => {
     .card {
       background: white;
       border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1);
       padding: 40px 32px;
     }
     .header {
@@ -300,13 +300,6 @@ router.get('/google', (req, res, next) => {
         <p>for SanBong.vn</p>
       </div>
 
-      <div class="dev-badge">⚙️ Development Mode (Mock)</div>
-
-      <div class="info-box">
-        <strong>Testing Google OAuth</strong><br>
-        Use any email address to test the registration and login flow.
-      </div>
-
       <form method="get" action="/api/auth/google/callback" onsubmit="return validateForm()">
         <div class="form-group">
           <label for="email">Email or phone</label>
@@ -315,7 +308,6 @@ router.get('/google', (req, res, next) => {
             id="email"
             name="email"
             placeholder="you@example.com"
-            value="testuser@gmail.com"
             required
             autofocus
           >
@@ -328,7 +320,6 @@ router.get('/google', (req, res, next) => {
             id="name"
             name="name"
             placeholder="Your name"
-            value="Test User"
             required
           >
         </div>
