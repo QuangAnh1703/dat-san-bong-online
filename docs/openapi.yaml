@@ -37,6 +37,7 @@ tags:
   - name: Xac thuc
   - name: Cum san
   - name: San con
+  - name: Bang gia
   - name: Dat san
 
 paths:
@@ -337,6 +338,147 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /api/pricing/{venueId}:
+    get:
+      tags: [Bang gia]
+      summary: Danh sach tat ca bang gia theo khung gio (SCRUM-121)
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Danh sach bang gia
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PricingRule' }
+
+    post:
+      tags: [Bang gia]
+      summary: Tao bang gia moi (SCRUM-121)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePricingRuleRequest' }
+      responses:
+        '201':
+          description: Tao bang gia thanh cong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PricingRule' }
+        '400':
+          description: Thieu truong bat buoc hoac khung gio khong hop le
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Khung gio bi chong lap (SCRUM-122, code: `PRICE_SLOT_OVERLAP`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/pricing/{venueId}/{id}:
+    get:
+      tags: [Bang gia]
+      summary: Chi tiet mot bang gia
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Chi tiet bang gia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PricingRule' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Bang gia]
+      summary: Cap nhat bang gia
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePricingRuleRequest' }
+      responses:
+        '200':
+          description: Cap nhat thanh cong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PricingRule' }
+        '400':
+          description: Du lieu khong hop le
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Khung gio bi chong lap (SCRUM-122)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+    delete:
+      tags: [Bang gia]
+      summary: Xoa bang gia
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Xoa thanh cong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id: { type: integer }
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /api/bookings:
     post:
@@ -708,6 +850,7 @@ components:
                 - NO_PRICE_RULE
                 - INVALID_STATUS
                 - HOLD_EXPIRED
+                - PRICE_SLOT_OVERLAP
                 - DB_UNAVAILABLE
                 - INTERNAL_ERROR
                 - NOT_IMPLEMENTED
@@ -777,6 +920,45 @@ components:
           type: array
           items: { type: string }
           example: [Den, Cang tin]
+
+    PricingRule:
+      type: object
+      properties:
+        id:            { type: integer }
+        venue_id:      { type: integer }
+        field_type:    { type: string, example: '5-a-side' }
+        day_type:      { type: string, enum: [WEEKDAY, WEEKEND, HOLIDAY] }
+        from_minute:   { type: integer, description: 'Phut tinh tu 00:00, VD: 540 = 09:00' }
+        to_minute:     { type: integer }
+        from_time:     { type: string, example: '09:00', description: 'Chuoi thoi gian (format HH:MM)' }
+        to_time:       { type: string, example: '10:00' }
+        base_price:    { type: number, example: 250000, description: 'Gia co so (VND/gio)' }
+        multiplier:    { type: number, example: 1.2, description: 'He so nhan (0.1-5)' }
+        label:         { type: string, example: 'Gio vang', nullable: true }
+        created_at:    { type: string, format: date-time }
+
+    CreatePricingRuleRequest:
+      type: object
+      required: [field_type, day_type, from_time, to_time, base_price]
+      properties:
+        field_type:  { type: string, example: '5-a-side' }
+        day_type:    { type: string, enum: [WEEKDAY, WEEKEND, HOLIDAY] }
+        from_time:   { type: string, example: '09:00' }
+        to_time:     { type: string, example: '10:00' }
+        base_price:  { type: number, example: 250000 }
+        multiplier:  { type: number, example: 1.0 }
+        label:       { type: string, nullable: true }
+
+    UpdatePricingRuleRequest:
+      type: object
+      properties:
+        field_type:  { type: string }
+        day_type:    { type: string }
+        from_time:   { type: string }
+        to_time:     { type: string }
+        base_price:  { type: number }
+        multiplier:  { type: number }
+        label:       { type: string, nullable: true }
 
     VenueDetail:
       allOf:
