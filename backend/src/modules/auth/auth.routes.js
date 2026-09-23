@@ -3,10 +3,11 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const passport = require('passport');
 const { AppError, requireFields } = require('../../lib/errors');
-const { findByEmail, createUserWithEmail, touchLastLogin } = require('./user.repository');
+const { findByPhone, findByEmail, createUserWithEmail, touchLastLogin } = require('./user.repository');
 const { signAccessToken, signRefreshToken } = require('./token');
 const { storeOtp, verifyOtp } = require('./otp.service');
 const { initGoogleOAuth } = require('./google-oauth.service');
+const { query } = require('../../db');
 
 const router = express.Router();
 
@@ -21,15 +22,33 @@ function toSafeUser(user) {
   return safe;
 }
 
-// POST /api/auth/login  body: { email, password }
+// POST /api/auth/login  body: { email OR phone_number, password }
+// Hỗ trợ đăng nhập bằng email hoặc số điện thoại
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body || {};
-    requireFields(req.body, ['email', 'password']);
+    const { email, phone_number, password } = req.body || {};
+    requireFields(req.body, ['password']);
 
-    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+    if (!email && !phone_number) {
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'email/phone_number', reason: 'Email hoặc số điện thoại là bắt buộc' }
+      });
+    }
 
-    const user = await findByEmail(email);
+    let user = null;
+
+    // Đăng nhập bằng email
+    if (email) {
+      if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+      user = await findByEmail(email);
+    }
+    // Đăng nhập bằng phone
+    else if (phone_number) {
+      const PHONE_RE = /^0[0-9]{9}$/;
+      if (!PHONE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
+      user = await findByPhone(phone_number);
+    }
+
     const ok = user && await bcrypt.compare(password, user.password_hash);
     if (!ok) throw new AppError('INVALID_CREDENTIALS');
 
@@ -96,14 +115,23 @@ router.post('/verify-otp', async (req, res, next) => {
   }
 });
 
-// POST /api/auth/register-with-otp  body: { temp_token, password, full_name, district_code? }
+// POST /api/auth/register-with-otp  body: { temp_token, password, full_name, district_code?, role? }
 // Register after OTP verification
+// role: 'PLAYER' (default) or 'OWNER'
 router.post('/register-with-otp', async (req, res, next) => {
   try {
-    const { temp_token, password, full_name, district_code } = req.body || {};
+    const { temp_token, password, full_name, district_code, role = 'PLAYER' } = req.body || {};
     requireFields(req.body, ['temp_token', 'password', 'full_name']);
 
     if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
+
+    // Validate role
+    const validRoles = ['PLAYER', 'OWNER'];
+    if (!validRoles.includes(role)) {
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` }
+      });
+    }
 
     // Decode temp token
     let verified;
@@ -127,6 +155,7 @@ router.post('/register-with-otp', async (req, res, next) => {
       passwordHash,
       fullName: full_name,
       districtCode: district_code,
+      role,
     });
 
     res.status(201).json({
@@ -450,6 +479,102 @@ router.get('/google/callback', async (req, res, next) => {
 router.post('/google/logout', (req, res) => {
   // Invalidate token on client side; server-side sessions handled by client
   res.json({ message: 'Logged out' });
+});
+
+// ===== PASSWORD RESET =====
+
+// POST /api/auth/forgot-password  body: { email }
+// Request OTP để reset mật khẩu
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = req.body || {};
+    requireFields(req.body, ['email']);
+
+    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+
+    const user = await findByEmail(email);
+    if (!user) {
+      // Không báo lỗi để tránh leak email existence
+      return res.json({ message: 'OTP sent to email if account exists' });
+    }
+
+    await storeOtp(email, 'RESET_PASSWORD');
+    res.json({ message: 'OTP sent to email', email: email.replace(/.{1,}@/, '*@') });
+  } catch (err) {
+    if (err.message.startsWith('OTP_LOCKED')) {
+      const seconds = err.message.split('_')[2];
+      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
+    } else {
+      next(err);
+    }
+  }
+});
+
+// POST /api/auth/verify-reset-otp  body: { email, otp }
+// Verify OTP để reset mật khẩu
+router.post('/verify-reset-otp', async (req, res, next) => {
+  try {
+    const { email, otp } = req.body || {};
+    requireFields(req.body, ['email', 'otp']);
+
+    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+
+    await verifyOtp(email, otp, 'RESET_PASSWORD');
+
+    // Return temp token (valid for 10 minutes)
+    const tempToken = Buffer.from(JSON.stringify({ email, verified_at: Date.now(), action: 'reset_password' })).toString('base64');
+    res.json({ temp_token: tempToken });
+  } catch (err) {
+    if (err.message === 'OTP_EXPIRED') {
+      next(new AppError('OTP_EXPIRED'));
+    } else if (err.message.startsWith('OTP_LOCKED')) {
+      const seconds = err.message.split('_')[2];
+      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
+    } else if (err.message.startsWith('OTP_INVALID')) {
+      const left = err.message.split('_')[2];
+      next(new AppError('OTP_INVALID', { message: `OTP khong dung. Con ${left}` }));
+    } else {
+      next(err);
+    }
+  }
+});
+
+// POST /api/auth/reset-password  body: { temp_token, password }
+// Reset mật khẩu với temp token từ OTP verification
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { temp_token, password } = req.body || {};
+    requireFields(req.body, ['temp_token', 'password']);
+
+    if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
+
+    // Decode temp token
+    let verified;
+    try {
+      const data = JSON.parse(Buffer.from(temp_token, 'base64').toString());
+      if (data.action !== 'reset_password') {
+        throw new AppError('INVALID_TEMP_TOKEN');
+      }
+      if (Date.now() - data.verified_at > 10 * 60 * 1000) {
+        throw new AppError('OTP_EXPIRED');
+      }
+      verified = data;
+    } catch (e) {
+      throw new AppError('INVALID_TEMP_TOKEN');
+    }
+
+    const { email } = verified;
+    const user = await findByEmail(email);
+    if (!user) throw new AppError('USER_NOT_FOUND');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await query(
+      `UPDATE app_user SET password_hash = $1, updated_at = now() WHERE id = $2`,
+      [passwordHash, user.id]
+    );
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

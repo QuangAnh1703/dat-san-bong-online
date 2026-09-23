@@ -2,9 +2,10 @@ import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import HomePage from './features/home/HomePage';
 import { GoogleCallbackPage } from './features/auth/GoogleCallbackPage';
-import { LoginPage } from './features/auth/LoginPage';
-import { RegisterPage } from './features/auth/RegisterPage';
+import { UnifiedAuthPage } from './features/auth/UnifiedAuthPage';
 import { OnboardingPage } from './features/auth/OnboardingPage';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
+import { OwnerDashboard } from './features/owner/OwnerDashboard';
 import PricingManagement from './features/pricing/PricingManagement';
 import ComingSoonPage from './pages/ComingSoonPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -19,10 +20,14 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'auth/login', element: <LoginPage /> },
-      { path: 'auth/register', element: <RegisterPage /> },
+      { path: 'auth', element: <UnifiedAuthPage /> },
+      { path: 'auth/login', element: <UnifiedAuthPage /> },
+      { path: 'auth/register', element: <UnifiedAuthPage /> },
+      { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
       { path: 'auth/google-callback', element: <GoogleCallbackPage /> },
+      { path: 'onboarding', element: <OnboardingPage /> },
       { path: 'auth/onboarding', element: <OnboardingPage /> },
+      { path: 'chu-san', element: <OwnerDashboard /> },
       { path: 'chu-san/gia/:venueId', element: <PricingManagement /> },
       { path: 'tim-san', element: <ComingSoonPage code="WF-02" title="Ket qua tim kiem & bo loc" /> },
       { path: 'san/:id', element: <ComingSoonPage code="WF-03" title="Chi tiet san & so do lich real-time" /> },

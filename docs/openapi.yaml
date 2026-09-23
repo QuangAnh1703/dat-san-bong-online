@@ -39,6 +39,9 @@ tags:
   - name: San con
   - name: Bang gia
   - name: Dat san
+  - name: Quan tri - Duyet san
+  - name: Quan tri - Duyet Chu san
+  - name: Quan tri - Quan ly Nguoi dung
 
 paths:
   /health:
@@ -107,7 +110,11 @@ paths:
   /api/auth/login:
     post:
       tags: [Xac thuc]
-      summary: Dang nhap bang so dien thoai, nhan JWT
+      summary: Dang nhap bang email hoac so dien thoai
+      description: |
+        Ho tro dang nhap bang email hoac so dien thoai va mat khau.
+        - Neu gui `email`: phai la email hop le
+        - Neu gui `phone_number`: phai la 10 chu so, bat dau bang 0
       requestBody:
         required: true
         content:
@@ -115,12 +122,17 @@ paths:
             schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
         '200':
-          description: Dang nhap thanh cong
+          description: Dang nhap thanh cong, nhan JWT
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400':
+          description: Thieu email/phone_number hoac password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401':
-          description: Sai SDT hoac mat khau (`INVALID_CREDENTIALS`)
+          description: Email/SDT hoac mat khau sai (`INVALID_CREDENTIALS`)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -189,6 +201,10 @@ paths:
     post:
       tags: [Xac thuc]
       summary: Dang ky sau khi xac minh OTP
+      description: |
+        Tao tai khoan sau khi OTP duoc xac minh.
+        - Neu `role` la `OWNER`, tai khoan se duoc tao voi vai tro OWNER ngay lap tuc.
+        - Neu `role` la `PLAYER` (mac dinh), user la PLAYER binh thuong va co the nang cap OWNER sau.
       requestBody:
         required: true
         content:
@@ -201,6 +217,7 @@ paths:
                 password:       { type: string, minLength: 6, example: 'password123' }
                 full_name:      { type: string, example: 'Nguyen Van A' }
                 district_code:  { type: string, example: 'CG', nullable: true }
+                role:           { type: string, enum: [PLAYER, OWNER], default: PLAYER, description: 'Mac dinh PLAYER. Chi PLAYER co the dang ky OWNER va phai duyet' }
       responses:
         '201':
           description: Tao tai khoan thanh cong, nhan JWT
@@ -208,7 +225,92 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AuthResponse' }
         '400':
-          description: Thieu truong, mat khau ngan, hoac temp token het han
+          description: Thieu truong, mat khau ngan, hoac temp token het han, hoac role khong hop le
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Xac thuc]
+      summary: Yeu cau OTP de dat lai mat khau
+      description: Gui OTP ve email. Con lai 15 phut.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, example: 'user@example.com' }
+      responses:
+        '200':
+          description: OTP gui thanh cong (khong tim thay email cung tra ve message nay de bao mat)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'OTP sent to email if account exists' }
+                  email:   { type: string, example: '*@example.com', description: 'Email da an dau co diem' }
+        '400':
+          description: Email sai dinh dang (`INVALID_EMAIL`)
+        '429':
+          description: Yeu cau qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+
+  /api/auth/verify-reset-otp:
+    post:
+      tags: [Xac thuc]
+      summary: Xac minh OTP de dat lai mat khau
+      description: Neu dung, tra ve temp_token (hieu luc 10 phut) dung de reset-password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email: { type: string, format: email, example: 'user@example.com' }
+                otp:   { type: string, example: '123456', maxLength: 6 }
+      responses:
+        '200':
+          description: OTP dung, nhan temp_token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  temp_token: { type: string, description: 'Dung de /reset-password' }
+        '400':
+          description: OTP khong dung, het han, hoac temp token khong hop le
+        '429':
+          description: Nhap sai qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+
+  /api/auth/reset-password:
+    post:
+      tags: [Xac thuc]
+      summary: Dat lai mat khau sau khi xac minh OTP
+      description: Dat lai mat khau sau khi OTP duoc xac minh.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [temp_token, password]
+              properties:
+                temp_token: { type: string, description: 'Tu /verify-reset-otp' }
+                password:   { type: string, minLength: 6, example: 'newpassword123' }
+      responses:
+        '200':
+          description: Dat lai mat khau thanh cong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Password reset successfully' }
+        '400':
+          description: Mat khau qua ngan hoac temp token khong hop le / het han (`OTP_EXPIRED`)
 
   /api/venues:
     get:
@@ -792,6 +894,286 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ===== Owner & User Management =====
+
+  /api/owner/request:
+    post:
+      tags: [Xac thuc]
+      summary: Yeu cau nang cap tu PLAYER sang OWNER
+      description: Cho phep nguoi choi yeu cau tro thanh chu san. Yeu cau phai duoc Admin duyet.
+      security:
+        - BearerAuth: []
+      responses:
+        '201':
+          description: Yeu cau nang cap da gui thanh cong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  request:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      user_id: { type: integer }
+                      status: { type: string, example: PENDING }
+                      requested_at: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          description: User khong phai PLAYER hoac da co yeu cau dang doi duyet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/owner/me:
+    get:
+      tags: [Xac thuc]
+      summary: Xem trang thai yeu cau OWNER cua user hien tai
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Trang thai yeu cau (null neu khong co)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    type: object
+                    nullable: true
+                    properties:
+                      id: { type: integer }
+                      status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+                      requested_at: { type: string, format: date-time }
+                      reviewed_at: { type: string, format: date-time, nullable: true }
+                  message: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/admin/owner-requests:
+    get:
+      tags: [Quan tri - Duyet Chu san]
+      summary: Danh sach yeu cau nang cap OWNER (ADMIN only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Danh sach yeu cau cho duyet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        user_id: { type: integer }
+                        status: { type: string, example: PENDING }
+                        requested_at: { type: string, format: date-time }
+                        email: { type: string }
+                        phone: { type: string, nullable: true }
+                        full_name: { type: string }
+                        district_code: { type: string, nullable: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/owner-requests/{id}/approve:
+    post:
+      tags: [Quan tri - Duyet Chu san]
+      summary: Phe duyet yeu cau nang cap OWNER
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Yeu cau da duoc phe duyet, user da tro thanh OWNER
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  request:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      user_id: { type: integer }
+                      status: { type: string, example: APPROVED }
+                      reviewed_at: { type: string, format: date-time }
+                      reviewed_by: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          description: Yeu cau khong o trang thai PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/admin/owner-requests/{id}/reject:
+    post:
+      tags: [Quan tri - Duyet Chu san]
+      summary: Tu choi yeu cau nang cap OWNER
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500, example: 'Tai khoan chua du dieu kien' }
+      responses:
+        '200':
+          description: Yeu cau da bi tu choi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  request:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      user_id: { type: integer }
+                      status: { type: string, example: REJECTED }
+                      rejection_reason: { type: string }
+                      reviewed_at: { type: string, format: date-time }
+                      reviewed_by: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/users:
+    get:
+      tags: [Quan tri - Quan ly Nguoi dung]
+      summary: Danh sach tat ca nguoi dung (ADMIN only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: role
+          in: query
+          schema: { type: string, enum: [PLAYER, OWNER, ADMIN] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING_VERIFY, ACTIVE, LOCKED] }
+      responses:
+        '200':
+          description: Danh sach nguoi dung
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        email: { type: string }
+                        phone: { type: string, nullable: true }
+                        role: { type: string, enum: [PLAYER, OWNER, ADMIN] }
+                        status: { type: string, enum: [PENDING_VERIFY, ACTIVE, LOCKED] }
+                        created_at: { type: string, format: date-time }
+                        full_name: { type: string }
+                        district_code: { type: string, nullable: true }
+                        reputation_score: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/users/{id}/role:
+    put:
+      tags: [Quan tri - Quan ly Nguoi dung]
+      summary: Thay doi vai tro cua nguoi dung (ADMIN only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [PLAYER, OWNER, ADMIN] }
+      responses:
+        '200':
+          description: Vai tro da duoc cap nhat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      email: { type: string }
+                      role: { type: string, enum: [PLAYER, OWNER, ADMIN] }
+                      status: { type: string, enum: [PENDING_VERIFY, ACTIVE, LOCKED] }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   parameters:
     VenueId:
@@ -870,10 +1252,11 @@ components:
 
     LoginRequest:
       type: object
-      required: [phone, password]
+      required: [password]
       properties:
-        phone:    { type: string, example: '0912345678' }
-        password: { type: string, format: password }
+        email:         { type: string, example: 'user@example.com', nullable: true, description: 'Email hoac phone_number, mot trong hai la bat buoc' }
+        phone_number:  { type: string, example: '0912345678', nullable: true, description: '10 chu so, bat dau bang 0' }
+        password:      { type: string, format: password, example: 'password123' }
 
     User:
       type: object
