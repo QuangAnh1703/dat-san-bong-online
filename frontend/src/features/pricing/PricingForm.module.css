@@ -1,0 +1,135 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroup label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.formGroup input,
+.formGroup select {
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: var(--pitch);
+  box-shadow: 0 0 0 3px rgba(20, 107, 74, 0.1);
+}
+
+.formGroup input:disabled,
+.formGroup select:disabled {
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.formGroup small {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+
+.warning {
+  padding: 12px 16px;
+  background: #FFF3CD;
+  border: 1px solid #FFC107;
+  border-radius: 8px;
+  color: #856404;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error {
+  padding: 12px 16px;
+  background: #F8D7DA;
+  border: 1px solid #F5C6CB;
+  border-radius: 8px;
+  color: #721C24;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btnPrimary,
+.btnSecondary {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: var(--tap);
+  transition: all 0.15s;
+  border: none;
+  touch-action: manipulation;
+}
+
+.btnPrimary {
+  background: var(--pitch);
+  color: white;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--pitch-dark);
+}
+
+.btnPrimary:disabled {
+  background: var(--text-3);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btnSecondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--line);
+}
+
+.btnSecondary:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
