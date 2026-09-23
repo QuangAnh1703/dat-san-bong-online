@@ -139,7 +139,19 @@ router.post('/register-with-otp', async (req, res, next) => {
 
 // GET /api/auth/google - Redirect to Google OAuth
 // Frontend should redirect to this endpoint to start Google login
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', (req, res, next) => {
+  const configured = process.env.GOOGLE_OAUTH_CLIENT_ID &&
+                     process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+                     !process.env.GOOGLE_OAUTH_CLIENT_ID.includes('placeholder');
+
+  if (!configured) {
+    return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED', {
+      message: 'Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env'
+    }));
+  }
+
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', passport.authenticate('google', { session: false }), async (req, res, next) => {

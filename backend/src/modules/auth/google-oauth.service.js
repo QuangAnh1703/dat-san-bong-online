@@ -6,11 +6,29 @@ const { findById, findByEmail, createUserWithOAuth, linkOAuthAccount } = require
 function initGoogleOAuth() {
   const clientID = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const callbackURL = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  const callbackURL = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback';
 
-  if (!clientID || !clientSecret) {
-    console.warn('⚠️ Google OAuth not configured - GOOGLE_OAUTH_CLIENT_ID/SECRET missing');
-    return null;
+  // Use placeholder values if not configured (for development)
+  const hasRealConfig = clientID && clientSecret && !clientID.includes('placeholder');
+
+  if (!hasRealConfig) {
+    console.warn('⚠️ Google OAuth not fully configured - using placeholders for testing');
+    console.warn('   Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env');
+
+    // Register strategy anyway for route to work, but it will fail at Google redirect
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: clientID || 'placeholder-client-id',
+          clientSecret: clientSecret || 'placeholder-client-secret',
+          callbackURL
+        },
+        (accessToken, refreshToken, profile, done) => {
+          done(new Error('Google OAuth not configured - missing CLIENT_ID or CLIENT_SECRET'));
+        }
+      )
+    );
+    return;
   }
 
   passport.use(
