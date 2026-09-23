@@ -11,6 +11,7 @@ import { today } from '../../lib/format';
 /** WF-02 - Ket qua tim kiem & bo loc */
 export default function SearchPage() {
   const [filters, setFilters] = useState({
+    q: '',
     district: '',
     fieldType: '',
     date: today(),

@@ -23,24 +23,24 @@ export function useVenues(filters) {
     setLoading(true);
     try {
       const data = await getVenues({
-        district: filters.district,
-        q: filters.q,
-        fieldType: filters.fieldType,
-        maxPrice: filters.priceRange[1],
-        minRating: filters.minRating > 0 ? filters.minRating : undefined,
-        amenities: filters.amenities.length > 0 ? filters.amenities.join(',') : undefined,
+        district: filters?.district || '',
+        q: filters?.q || '',
+        fieldType: filters?.fieldType || '',
+        maxPrice: filters?.priceRange?.[1],
+        minRating: filters?.minRating > 0 ? filters.minRating : undefined,
+        amenities: filters?.amenities?.length > 0 ? filters.amenities.join(',') : undefined,
       });
       setVenues(data);
       setIsDemo(false);
     } catch (err) {
       console.warn('[API] khong goi duoc, dung du lieu mau:', err.message);
-      const name = DEMO_DISTRICTS.find((d) => d.code === filters.district)?.name;
+      const name = DEMO_DISTRICTS.find((d) => d.code === filters?.district)?.name;
       setVenues(name ? DEMO_VENUES.filter((v) => v.district_name === name) : DEMO_VENUES);
       setIsDemo(true);
     } finally {
       setLoading(false);
     }
-  }, [filters.district, filters.q, filters.fieldType, filters.priceRange, filters.minRating, filters.amenities]);
+  }, [filters?.district, filters?.q, filters?.fieldType, filters?.priceRange, filters?.minRating, filters?.amenities]);
 
   useEffect(() => { load(); }, [load]);
 

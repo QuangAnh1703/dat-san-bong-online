@@ -33,6 +33,11 @@ export default function SearchBar({ districts, filters, onChange, onSubmit }) {
     <div className="wrap searchwrap">
       <form className="search" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <div className="field">
+          <label htmlFor="f-search">Tim san</label>
+          <input id="f-search" type="text" placeholder="Tim ten san..." value={filters.q || ''} onChange={set('q')} />
+        </div>
+
+        <div className="field">
           <label htmlFor="f-area">Khu vuc</label>
           <select id="f-area" value={filters.district} onChange={set('district')}>
             <option value="">Tat ca quan/huyen</option>

@@ -14,7 +14,14 @@ import { today } from '../../lib/format';
 /** WF-01 - Trang chu (Nguoi choi) */
 export default function HomePage() {
   const [filters, setFilters] = useState({
-    district: '', fieldType: '', date: today(), time: '',
+    q: '',
+    district: '',
+    fieldType: '',
+    date: today(),
+    time: '',
+    priceRange: [0, 1000000],
+    amenities: [],
+    minRating: 0,
   });
   const { districts, venues, loading, isDemo, reload } = useVenues(filters);
 
