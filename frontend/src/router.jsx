@@ -1,6 +1,14 @@
 import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import HomePage from './features/home/HomePage';
+import SearchPage from './features/search/SearchPage';
+import VenueDetailPage from './features/venue/VenueDetailPage';
+import PaymentPage from './features/payment/PaymentPage';
+import SubscriptionPage from './features/subscription/SubscriptionPage';
+import MyBookingsPage from './features/bookings/MyBookingsPage';
+import FindTeamPage from './features/team/FindTeamPage';
+import MatchmakingPage from './features/matchmaking/MatchmakingPage';
+import ProfilePage from './features/profile/ProfilePage';
 import { GoogleCallbackPage } from './features/auth/GoogleCallbackPage';
 import { UnifiedAuthPage } from './features/auth/UnifiedAuthPage';
 import { OnboardingPage } from './features/auth/OnboardingPage';
@@ -29,15 +37,14 @@ export const router = createBrowserRouter([
       { path: 'auth/onboarding', element: <OnboardingPage /> },
       { path: 'chu-san', element: <OwnerDashboard /> },
       { path: 'chu-san/gia/:venueId', element: <PricingManagement /> },
-      { path: 'tim-san', element: <ComingSoonPage code="WF-02" title="Ket qua tim kiem & bo loc" /> },
-      { path: 'san/:id', element: <ComingSoonPage code="WF-03" title="Chi tiet san & so do lich real-time" /> },
-      { path: 'thanh-toan/:code', element: <ComingSoonPage code="WF-04" title="Xac nhan & thanh toan tien coc" /> },
-      { path: 'dat-dinh-ky', element: <ComingSoonPage code="WF-05" title="Dat san dinh ky" /> },
-      { path: 'lich-cua-toi', element: <ComingSoonPage code="WF-06" title="Quan ly lich da & danh gia" /> },
-      { path: 'giao-huu', element: <ComingSoonPage code="WF-07" title="Tim doi giao huu" /> },
-      { path: 'ghep-chan-le', element: <ComingSoonPage code="WF-08" title="Ghep chan le" /> },
-      { path: 'ho-so', element: <ComingSoonPage code="WF-09" title="Ho so & diem uy tin" /> },
-      { path: 'chu-san', element: <ComingSoonPage code="WF-10" title="Dashboard doanh thu chu san" /> },
+      { path: 'tim-san', element: <SearchPage /> },
+      { path: 'san/:id', element: <VenueDetailPage /> },
+      { path: 'thanh-toan/:code', element: <PaymentPage /> },
+      { path: 'dat-dinh-ky', element: <SubscriptionPage /> },
+      { path: 'lich-cua-toi', element: <MyBookingsPage /> },
+      { path: 'giao-huu', element: <FindTeamPage /> },
+      { path: 'ghep-chan-le', element: <MatchmakingPage /> },
+      { path: 'ho-so', element: <ProfilePage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
