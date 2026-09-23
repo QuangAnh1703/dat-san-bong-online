@@ -17,8 +17,7 @@ router.get('/', async (req, res, next) => {
     const field_type = fieldType ? fieldType.trim() : null;
     const amenity_list = amenities ? amenities.split(',').map((a) => a.trim().toLowerCase()) : [];
 
-    const r = await query(
-      `SELECT DISTINCT v.id, v.name, v.address, v.district_code, d.name AS district_name,
+    let sql = `SELECT DISTINCT v.id, v.name, v.address, v.district_code, d.name AS district_name,
               v.phone, v.avg_rating, v.rating_count,
               v.open_time, v.close_time, v.deposit_rate,
               (SELECT count(*) FROM field f WHERE f.venue_id = v.id AND f.is_active) AS field_count,
@@ -29,21 +28,34 @@ router.get('/', async (req, res, next) => {
                 WHERE va.venue_id = v.id), '{}') AS amenities
          FROM venue v
          JOIN district d ON d.code = v.district_code
-        WHERE v.status = 'APPROVED'
-          AND ($1::varchar IS NULL OR v.district_code = $1)
-          AND ($2::text IS NULL OR v.name ILIKE '%' || $2 || '%' OR v.address ILIKE '%' || $2 || '%')
-          AND ($3::varchar IS NULL OR EXISTS (SELECT 1 FROM field f WHERE f.venue_id = v.id AND f.is_active AND f.type = $3))
-          AND ($4::float IS NULL OR (SELECT min(round(pr.base_price * pr.multiplier)) FROM price_rule pr WHERE pr.venue_id = v.id) <= $4)
-          AND ($5::float IS NULL OR v.avg_rating >= $5)
-        ORDER BY v.avg_rating DESC, v.rating_count DESC`,
-      [
-        district || null,
-        q || null,
-        field_type,
-        max_price < Number.MAX_VALUE ? max_price : null,
-        min_rating > 0 ? min_rating : null
-      ]
-    );
+        WHERE v.status = 'APPROVED'`;
+
+    const params = [];
+    if (district) {
+      params.push(district);
+      sql += ` AND v.district_code = $${params.length}`;
+    }
+    if (q) {
+      params.push(`%${q}%`);
+      const param_idx = params.length;
+      sql += ` AND (v.name ILIKE $${param_idx} OR v.address ILIKE $${param_idx})`;
+    }
+    if (field_type) {
+      params.push(field_type);
+      sql += ` AND EXISTS (SELECT 1 FROM field f WHERE f.venue_id = v.id AND f.is_active AND f.type = $${params.length})`;
+    }
+    if (max_price < Number.MAX_VALUE) {
+      params.push(max_price);
+      sql += ` AND (SELECT min(round(pr.base_price * pr.multiplier)) FROM price_rule pr WHERE pr.venue_id = v.id) <= $${params.length}`;
+    }
+    if (min_rating > 0) {
+      params.push(min_rating);
+      sql += ` AND v.avg_rating >= $${params.length}`;
+    }
+
+    sql += ` ORDER BY v.avg_rating DESC, v.rating_count DESC`;
+
+    const r = await query(sql, params);
 
     // Post-process to filter by amenities if provided
     let filtered_rows = r.rows;

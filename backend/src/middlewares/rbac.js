@@ -55,9 +55,10 @@ function requireRole(...allowedRoles) {
  */
 
 const permissions = {
-  // Venues - PLAYER can view, OWNER can manage
-  'GET /api/venues': ['PLAYER', 'OWNER', 'ADMIN'],
-  'GET /api/venues/:id': ['PLAYER', 'OWNER', 'ADMIN'],
+  // Venues - Public search, Auth required for details and management
+  'GET /api/venues': [], // PUBLIC - allow browsing all venues
+  'GET /api/venues/:id': [], // PUBLIC - allow viewing venue details
+  // OR use these if you want auth: ['PLAYER', 'OWNER', 'ADMIN'],
   'POST /api/venues': ['OWNER', 'ADMIN'],
   'PUT /api/venues/:id': ['OWNER', 'ADMIN'],
   'DELETE /api/venues/:id': ['OWNER', 'ADMIN'],
