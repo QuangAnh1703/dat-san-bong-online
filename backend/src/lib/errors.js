@@ -43,6 +43,7 @@ const ERRORS = {
   NO_PRICE_RULE:      { status: 409, message: 'Chua co bang gia cho khung gio nay' },
   INVALID_STATUS:     { status: 409, message: 'Don dang o trang thai khong cho phep thao tac nay' },
   HOLD_EXPIRED:       { status: 409, message: 'Da qua thoi gian giu cho' },
+  PRICE_SLOT_OVERLAP: { status: 409, message: 'Khung gio gia bi chong lap voi khung gio khac' },
 
   // --- 429 Rate limit ---
   OTP_RATE_LIMITED:   { status: 429, message: 'Da nhap sai qua nhieu lan. Vui long thu lai sau' },
@@ -75,7 +76,14 @@ class AppError extends Error {
 /** Ma loi PostgreSQL -> AppError tuong ung */
 function fromDbError(err) {
   switch (err.code) {
-    case '23P01': // exclusion_violation: hai don giu cung khung gio
+    case '23P01': // exclusion_violation: hai don giu cung khung gio hoac khung gia bi chong lap
+      // Check constraint name to distinguish between SLOT_TAKEN and PRICE_SLOT_OVERLAP
+      if (err.constraint === 'no_price_overlap') {
+        return new AppError('PRICE_SLOT_OVERLAP', {
+          message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
+          cause: err,
+        });
+      }
       return new AppError('SLOT_TAKEN', { cause: err });
     case '23514': // check_violation
       return new AppError('CONSTRAINT_VIOLATED', {

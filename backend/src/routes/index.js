@@ -82,6 +82,7 @@ router.use('/api/profile', require('../modules/profile/profile.routes'));
 router.use('/api/admin', require('../modules/admin/admin.routes'));
 router.use('/api/venues', require('../modules/venues/venues.routes'));
 router.use('/api/fields', require('../modules/venues/fields.routes'));
+router.use('/api/pricing', require('../modules/pricing/pricing.routes'));
 router.use('/api/bookings', require('../modules/bookings/bookings.routes'));
 router.use('/api/payments', require('../modules/payments/payments.routes'));
 router.use('/api/community', require('../modules/community/community.routes'));
