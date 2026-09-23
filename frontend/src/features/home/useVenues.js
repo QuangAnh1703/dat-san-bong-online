@@ -22,7 +22,14 @@ export function useVenues(filters) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getVenues({ district: filters.district });
+      const data = await getVenues({
+        district: filters.district,
+        q: filters.q,
+        fieldType: filters.fieldType,
+        maxPrice: filters.priceRange[1],
+        minRating: filters.minRating > 0 ? filters.minRating : undefined,
+        amenities: filters.amenities.length > 0 ? filters.amenities.join(',') : undefined,
+      });
       setVenues(data);
       setIsDemo(false);
     } catch (err) {
@@ -33,7 +40,7 @@ export function useVenues(filters) {
     } finally {
       setLoading(false);
     }
-  }, [filters.district]);
+  }, [filters.district, filters.q, filters.fieldType, filters.priceRange, filters.minRating, filters.amenities]);
 
   useEffect(() => { load(); }, [load]);
 

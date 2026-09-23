@@ -25,7 +25,11 @@ export default function FilterSidebar({ districts, filters, onChange }) {
   };
 
   const amenityOptions = ['Den', 'Bai xe', 'Wifi', 'Cang tin', 'Trong tai'];
-  const fieldTypeOptions = ['5-a-side', '7-a-side', '11-a-side'];
+  const fieldTypeOptions = [
+    { value: 'F5', label: '5-a-side' },
+    { value: 'F7', label: '7-a-side' },
+    { value: 'F11', label: '11-a-side' },
+  ];
 
   return (
     <div className="filter-group">
@@ -63,13 +67,13 @@ export default function FilterSidebar({ districts, filters, onChange }) {
         <h3>Loai san</h3>
         <div className="filter-options">
           {fieldTypeOptions.map((type) => (
-            <label className="checkbox" key={type}>
+            <label className="checkbox" key={type.value}>
               <input
                 type="checkbox"
-                checked={filters.fieldType === type}
-                onChange={() => handleFieldTypeChange(type)}
+                checked={filters.fieldType === type.value}
+                onChange={() => handleFieldTypeChange(type.value)}
               />
-              <span>{type}</span>
+              <span>{type.label}</span>
             </label>
           ))}
         </div>

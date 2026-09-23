@@ -6,18 +6,25 @@ const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
 const router = express.Router();
 
-// GET /api/venues?district=CG&q=my dinh
+// GET /api/venues?district=CG&q=my dinh&fieldType=5-a-side&maxPrice=500000&minRating=3.5&amenities=Den,Wifi
 router.get('/', async (req, res, next) => {
   try {
-    const { district, q } = req.query;
+    const { district, q, fieldType, maxPrice, minRating, amenities } = req.query;
+
+    // Parse numeric values
+    const max_price = maxPrice ? parseFloat(maxPrice) : Number.MAX_VALUE;
+    const min_rating = minRating ? parseFloat(minRating) : 0;
+    const field_type = fieldType ? fieldType.trim() : null;
+    const amenity_list = amenities ? amenities.split(',').map((a) => a.trim().toLowerCase()) : [];
+
     const r = await query(
-      `SELECT v.id, v.name, v.address, v.district_code, d.name AS district_name,
+      `SELECT DISTINCT v.id, v.name, v.address, v.district_code, d.name AS district_name,
               v.phone, v.avg_rating, v.rating_count,
               v.open_time, v.close_time, v.deposit_rate,
               (SELECT count(*) FROM field f WHERE f.venue_id = v.id AND f.is_active) AS field_count,
               (SELECT min(round(pr.base_price * pr.multiplier))
                  FROM price_rule pr WHERE pr.venue_id = v.id) AS min_price,
-              COALESCE((SELECT array_agg(a.name ORDER BY a.name)
+              COALESCE((SELECT array_agg(DISTINCT a.name ORDER BY a.name)
                  FROM venue_amenity va JOIN amenity a ON a.code = va.amenity_code
                 WHERE va.venue_id = v.id), '{}') AS amenities
          FROM venue v
@@ -25,10 +32,33 @@ router.get('/', async (req, res, next) => {
         WHERE v.status = 'APPROVED'
           AND ($1::varchar IS NULL OR v.district_code = $1)
           AND ($2::text IS NULL OR v.name ILIKE '%' || $2 || '%' OR v.address ILIKE '%' || $2 || '%')
+          AND ($3::varchar IS NULL OR EXISTS (SELECT 1 FROM field f WHERE f.venue_id = v.id AND f.is_active AND f.type = $3))
+          AND ($4::float IS NULL OR (SELECT min(round(pr.base_price * pr.multiplier)) FROM price_rule pr WHERE pr.venue_id = v.id) <= $4)
+          AND ($5::float IS NULL OR v.avg_rating >= $5)
         ORDER BY v.avg_rating DESC, v.rating_count DESC`,
-      [district || null, q || null]
+      [
+        district || null,
+        q || null,
+        field_type,
+        max_price < Number.MAX_VALUE ? max_price : null,
+        min_rating > 0 ? min_rating : null
+      ]
     );
-    res.json({ count: r.rowCount, data: r.rows });
+
+    // Post-process to filter by amenities if provided
+    let filtered_rows = r.rows;
+    if (amenity_list.length > 0) {
+      filtered_rows = r.rows.filter((venue) => {
+        const venue_amenities = venue.amenities || [];
+        return amenity_list.every((req_amenity) =>
+          venue_amenities.some((v_amenity) =>
+            v_amenity.toLowerCase() === req_amenity
+          )
+        );
+      });
+    }
+
+    res.json({ count: filtered_rows.length, data: filtered_rows });
   } catch (e) { next(e); }
 });
 
