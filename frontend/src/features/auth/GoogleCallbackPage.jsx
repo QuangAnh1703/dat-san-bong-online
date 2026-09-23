@@ -14,7 +14,14 @@ export function GoogleCallbackPage() {
     try {
       const result = handleGoogleCallback(searchParams);
       login(result);
-      navigate('/');
+
+      // Check if profile is complete - redirect to onboarding if not
+      const { user } = result;
+      if (!user.fullName) {
+        navigate('/auth/onboarding');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Google login failed');
       setLoading(false);

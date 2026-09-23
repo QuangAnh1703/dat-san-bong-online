@@ -4,6 +4,7 @@ import HomePage from './features/home/HomePage';
 import { GoogleCallbackPage } from './features/auth/GoogleCallbackPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
+import { OnboardingPage } from './features/auth/OnboardingPage';
 import PricingManagement from './features/pricing/PricingManagement';
 import ComingSoonPage from './pages/ComingSoonPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'auth/login', element: <LoginPage /> },
       { path: 'auth/register', element: <RegisterPage /> },
       { path: 'auth/google-callback', element: <GoogleCallbackPage /> },
+      { path: 'auth/onboarding', element: <OnboardingPage /> },
       { path: 'chu-san/gia/:venueId', element: <PricingManagement /> },
       { path: 'tim-san', element: <ComingSoonPage code="WF-02" title="Ket qua tim kiem & bo loc" /> },
       { path: 'san/:id', element: <ComingSoonPage code="WF-03" title="Chi tiet san & so do lich real-time" /> },
