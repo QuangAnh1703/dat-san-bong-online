@@ -232,6 +232,9 @@ export function UnifiedAuthPage() {
                   required
                   disabled={loginLoading}
                 />
+                <a href="/auth/forgot-password" className={styles.forgotPasswordLink}>
+                  Quên mật khẩu?
+                </a>
               </div>
 
               <button

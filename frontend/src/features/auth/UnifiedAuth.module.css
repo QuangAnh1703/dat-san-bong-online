@@ -248,6 +248,21 @@
   text-decoration: none;
 }
 
+.forgotPasswordLink {
+  display: block;
+  font-size: 0.875rem;
+  color: #1f71b8;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s;
+  margin-top: 0.5rem;
+}
+
+.forgotPasswordLink:hover {
+  text-decoration: underline;
+  color: #1765a0;
+}
+
 /* Right: OAuth Section */
 .oauthSection {
   display: none;
