@@ -137,45 +137,116 @@ router.post('/register-with-otp', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/auth/google - Redirect to Google OAuth
-// Frontend should redirect to this endpoint to start Google login
+// GET /api/auth/google - Redirect to Google OAuth (or mock login)
 router.get('/google', (req, res, next) => {
-  const configured = process.env.GOOGLE_OAUTH_CLIENT_ID &&
-                     process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
-                     !process.env.GOOGLE_OAUTH_CLIENT_ID.includes('placeholder');
+  const isDev = process.env.NODE_ENV !== 'production';
+  const clientID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const hasRealConfig = clientID && clientSecret && !clientID.includes('mock');
 
-  if (!configured) {
-    return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED', {
-      message: 'Google OAuth not configured. Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env'
-    }));
+  // Dev mode without real credentials: show mock login dialog
+  if (!hasRealConfig && isDev) {
+    return res.type('html').send(`
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mock Google Login</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
+    .card { background: white; padding: 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 400px; }
+    h1 { margin: 0 0 24px; font-size: 20px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
+    input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+    button { width: 100%; padding: 10px; background: #4285f4; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
+    button:hover { background: #3367d6; }
+    .info { background: #e8f0fe; padding: 12px; border-radius: 4px; margin-bottom: 24px; font-size: 12px; color: #1f2937; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔐 Mock Google Login</h1>
+    <div class="info">
+      Development mode - use any email to test
+    </div>
+    <form method="get" action="/api/auth/google/callback">
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" value="testuser@gmail.com" required>
+      </div>
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" value="Test User" required>
+      </div>
+      <button type="submit">🔗 Login with Mock Google</button>
+    </form>
+  </div>
+</body>
+</html>
+    `);
+  }
+
+  if (!hasRealConfig && !isDev) {
+    return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED'));
   }
 
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
-router.get('/google/callback', passport.authenticate('google', { session: false }), async (req, res, next) => {
+router.get('/google/callback', async (req, res, next) => {
   try {
-    const user = req.user;
-    if (!user) throw new AppError('GOOGLE_LOGIN_FAILED');
+    const { handleGoogleCallbackMock } = require('./google-oauth.service');
+    const isDev = process.env.NODE_ENV !== 'production';
+    const clientID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+    const hasRealConfig = clientID && clientSecret && !clientID.includes('mock');
 
+    let user;
+
+    // Mock mode
+    if (!hasRealConfig && isDev && (req.query.email || req.query.name)) {
+      const result = await handleGoogleCallbackMock(req, res);
+      user = result.user;
+    } else if (hasRealConfig) {
+      // Real Google OAuth
+      return passport.authenticate('google', { session: false }, async (err, authenticatedUser) => {
+        if (err || !authenticatedUser) {
+          return next(new AppError('GOOGLE_LOGIN_FAILED', { cause: err }));
+        }
+        user = authenticatedUser;
+        await touchLastLogin(user.id);
+        const safeUser = toSafeUser(user);
+        const tokens = {
+          access_token: signAccessToken(user),
+          refresh_token: signRefreshToken(user),
+          user: safeUser,
+        };
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const params = new URLSearchParams();
+        params.set('access_token', tokens.access_token);
+        params.set('refresh_token', tokens.refresh_token);
+        params.set('user', JSON.stringify(tokens.user));
+        res.redirect(`${frontendUrl}/auth/google-callback?${params.toString()}`);
+      })(req, res, next);
+    } else {
+      return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED'));
+    }
+
+    // Handle mock flow response
     await touchLastLogin(user.id);
-
-    // Generate tokens
     const safeUser = toSafeUser(user);
     const tokens = {
       access_token: signAccessToken(user),
       refresh_token: signRefreshToken(user),
       user: safeUser,
     };
-
-    // Redirect to frontend with tokens in URL
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const params = new URLSearchParams();
     params.set('access_token', tokens.access_token);
     params.set('refresh_token', tokens.refresh_token);
     params.set('user', JSON.stringify(tokens.user));
-
     res.redirect(`${frontendUrl}/auth/google-callback?${params.toString()}`);
   } catch (err) {
     next(err);

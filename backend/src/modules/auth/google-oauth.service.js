@@ -1,37 +1,25 @@
 'use strict';
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const { findById, findByEmail, createUserWithOAuth, linkOAuthAccount } = require('./user.repository');
+const { findById, findByEmail, createUserWithOAuth, linkOAuthAccount, findOAuthAccount } = require('./user.repository');
 
 function initGoogleOAuth() {
   const clientID = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const callbackURL = process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback';
+  const isDev = process.env.NODE_ENV !== 'production';
 
-  // Use placeholder values if not configured (for development)
-  const hasRealConfig = clientID && clientSecret && !clientID.includes('placeholder');
+  // Use mock mode if credentials not provided
+  const useMock = !clientID || !clientSecret || clientID === 'mock' || clientSecret === 'mock';
 
-  if (!hasRealConfig) {
-    console.warn('⚠️ Google OAuth not fully configured - using placeholders for testing');
-    console.warn('   Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env');
-
-    // Register strategy anyway for route to work, but it will fail at Google redirect
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID: clientID || 'placeholder-client-id',
-          clientSecret: clientSecret || 'placeholder-client-secret',
-          callbackURL
-        },
-        (accessToken, refreshToken, profile, done) => {
-          done(new Error('Google OAuth not configured - missing CLIENT_ID or CLIENT_SECRET'));
-        }
-      )
-    );
+  if (useMock && isDev) {
+    console.log('✅ Google OAuth: Using MOCK mode (development)');
     return;
   }
 
+  // Real Google OAuth
   passport.use(
+    'google',
     new GoogleStrategy(
       { clientID, clientSecret, callbackURL },
       async (accessToken, refreshToken, profile, done) => {
@@ -46,15 +34,11 @@ function initGoogleOAuth() {
           let user = await findByEmail(email);
 
           if (user) {
-            // User exists - link OAuth if not already linked
-            const { findOAuthAccount } = require('./user.repository');
             const existing = await findOAuthAccount(user.id, 'GOOGLE', googleId);
-
             if (!existing) {
               await linkOAuthAccount(user.id, 'GOOGLE', googleId);
             }
           } else {
-            // Create new user with OAuth
             user = await createUserWithOAuth({
               email,
               fullName: displayName || email.split('@')[0],
@@ -85,4 +69,31 @@ function initGoogleOAuth() {
   });
 }
 
-module.exports = { initGoogleOAuth };
+async function handleGoogleCallbackMock(req, res) {
+  try {
+    const { email, name } = req.query;
+    const mockGoogleId = 'mock-' + Math.random().toString(36).substr(2, 9);
+
+    let user = await findByEmail(email || 'mockuser@gmail.com');
+
+    if (user) {
+      const existing = await findOAuthAccount(user.id, 'GOOGLE', mockGoogleId);
+      if (!existing) {
+        await linkOAuthAccount(user.id, 'GOOGLE', mockGoogleId);
+      }
+    } else {
+      user = await createUserWithOAuth({
+        email: email || 'mockuser@gmail.com',
+        fullName: name || 'Mock User',
+        provider: 'GOOGLE',
+        providerId: mockGoogleId,
+      });
+    }
+
+    return { user, mockGoogleId };
+  } catch (err) {
+    throw err;
+  }
+}
+
+module.exports = { initGoogleOAuth, handleGoogleCallbackMock };
