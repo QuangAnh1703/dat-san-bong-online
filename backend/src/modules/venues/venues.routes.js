@@ -1,7 +1,9 @@
 'use strict';
 const express = require('express');
-const { query } = require('../../db');
-const { AppError } = require('../../lib/errors');
+const { query, withTransaction } = require('../../db');
+const { AppError, requireFields } = require('../../lib/errors');
+const { requireAuthenticated } = require('../../middlewares/auth');
+const { requireRole } = require('../../middlewares/rbac');
 const router = express.Router();
 
 // GET /api/venues?district=CG&q=my dinh
@@ -65,6 +67,201 @@ router.get('/:id/revenue', async (req, res, next) => {
       [Number(req.params.id)]);
     res.json({ count: r.rowCount, data: r.rows });
   } catch (e) { next(e); }
+});
+
+// POST /api/venues - Create venue (SCRUM-115, OWNER/ADMIN only)
+router.post('/', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { name, address, district_code, phone, latitude, longitude, open_time, close_time, deposit_rate, amenities } = req.body;
+    requireFields(req.body, ['name', 'address', 'district_code', 'phone', 'latitude', 'longitude']);
+
+    // Validation
+    if (typeof name !== 'string' || name.trim().length === 0 || name.length > 120) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 120 chars' } }));
+    }
+    if (typeof address !== 'string' || address.length > 255) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'address', reason: 'Max 255 chars' } }));
+    }
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'phone', reason: 'Invalid format' } }));
+    }
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'coordinates', reason: 'Must be numbers' } }));
+    }
+
+    const result = await withTransaction(async (c) => {
+      // Create venue
+      const v = await c.query(
+        `INSERT INTO venue (name, address, district_code, phone, latitude, longitude, open_time, close_time, deposit_rate, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING')
+         RETURNING id, name, address, district_code, phone, latitude, longitude, status, created_at`,
+        [name.trim(), address.trim(), district_code, phone, latitude, longitude, open_time || '09:00', close_time || '22:00', deposit_rate || 0]
+      );
+
+      const venueId = v.rows[0].id;
+
+      // Add amenities if provided
+      if (Array.isArray(amenities) && amenities.length > 0) {
+        for (const amenityCode of amenities) {
+          await c.query(
+            `INSERT INTO venue_amenity (venue_id, amenity_code) VALUES ($1, $2)`,
+            [venueId, amenityCode]
+          );
+        }
+      }
+
+      return v.rows[0];
+    });
+
+    res.status(201).json({ message: 'Venue created', venue: result });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/venues/:id - Update venue (SCRUM-115)
+router.put('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const venueId = Number(req.params.id);
+    const { name, address, phone, open_time, close_time, deposit_rate, amenities } = req.body;
+
+    // Validation
+    if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.length > 120)) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 120 chars' } }));
+    }
+    if (phone !== undefined && !/^[0-9]{10}$/.test(phone)) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'phone', reason: 'Invalid format' } }));
+    }
+
+    const updates = [];
+    const values = [venueId];
+    let paramCount = 2;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount}`);
+      values.push(name.trim());
+      paramCount++;
+    }
+    if (address !== undefined) {
+      updates.push(`address = $${paramCount}`);
+      values.push(address.trim());
+      paramCount++;
+    }
+    if (phone !== undefined) {
+      updates.push(`phone = $${paramCount}`);
+      values.push(phone);
+      paramCount++;
+    }
+    if (open_time !== undefined) {
+      updates.push(`open_time = $${paramCount}`);
+      values.push(open_time);
+      paramCount++;
+    }
+    if (close_time !== undefined) {
+      updates.push(`close_time = $${paramCount}`);
+      values.push(close_time);
+      paramCount++;
+    }
+    if (deposit_rate !== undefined) {
+      updates.push(`deposit_rate = $${paramCount}`);
+      values.push(deposit_rate);
+      paramCount++;
+    }
+
+    updates.push(`updated_at = now()`);
+
+    if (updates.length === 1) {
+      return res.json({ message: 'No changes' });
+    }
+
+    const updateQuery = `UPDATE venue SET ${updates.join(', ')} WHERE id = $1 RETURNING *`;
+    const result = await query(updateQuery, values);
+
+    if (result.rowCount === 0) {
+      return next(new AppError('VENUE_NOT_FOUND'));
+    }
+
+    // Update amenities if provided
+    if (Array.isArray(amenities)) {
+      await query(`DELETE FROM venue_amenity WHERE venue_id = $1`, [venueId]);
+      for (const amenityCode of amenities) {
+        await query(
+          `INSERT INTO venue_amenity (venue_id, amenity_code) VALUES ($1, $2)`,
+          [venueId, amenityCode]
+        );
+      }
+    }
+
+    res.json({ message: 'Venue updated', venue: result.rows[0] });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/venues/:id - Delete venue (SCRUM-115)
+router.delete('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const venueId = Number(req.params.id);
+
+    const result = await withTransaction(async (c) => {
+      // Delete related data
+      await c.query(`DELETE FROM venue_amenity WHERE venue_id = $1`, [venueId]);
+      await c.query(`DELETE FROM venue_image WHERE venue_id = $1`, [venueId]);
+      await c.query(`DELETE FROM field WHERE venue_id = $1`, [venueId]);
+
+      // Delete venue
+      const r = await c.query(`DELETE FROM venue WHERE id = $1 RETURNING id`, [venueId]);
+      return r.rowCount;
+    });
+
+    if (result === 0) {
+      return next(new AppError('VENUE_NOT_FOUND'));
+    }
+
+    res.json({ message: 'Venue deleted' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/venues/:id/images - Upload venue images (SCRUM-117)
+router.post('/:id/images', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const venueId = Number(req.params.id);
+    const { image_urls } = req.body;
+
+    if (!Array.isArray(image_urls) || image_urls.length === 0) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'image_urls', reason: 'Array required' } }));
+    }
+
+    const images = [];
+    for (let i = 0; i < image_urls.length; i++) {
+      const r = await query(
+        `INSERT INTO venue_image (venue_id, image_url, display_order, uploaded_at)
+         VALUES ($1, $2, $3, now())
+         RETURNING id, image_url, display_order`,
+        [venueId, image_urls[i], i + 1]
+      );
+      images.push(r.rows[0]);
+    }
+
+    res.status(201).json({ message: 'Images uploaded', images });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/venues/:id/images/order - Reorder images (SCRUM-117)
+router.put('/:id/images/order', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const venueId = Number(req.params.id);
+    const { image_ids } = req.body;
+
+    if (!Array.isArray(image_ids)) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'image_ids', reason: 'Array required' } }));
+    }
+
+    for (let i = 0; i < image_ids.length; i++) {
+      await query(
+        `UPDATE venue_image SET display_order = $1 WHERE id = $2 AND venue_id = $3`,
+        [i + 1, image_ids[i], venueId]
+      );
+    }
+
+    res.json({ message: 'Image order updated' });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
