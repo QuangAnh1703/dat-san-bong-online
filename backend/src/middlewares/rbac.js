@@ -71,9 +71,16 @@ const permissions = {
   'DELETE /api/bookings/:code': ['PLAYER', 'OWNER', 'ADMIN'],
 
   // Community - PLAYER can use
-  'POST /api/community/posts': ['PLAYER', 'OWNER', 'ADMIN'],
   'GET /api/community/posts': ['PLAYER', 'OWNER', 'ADMIN'],
-  'POST /api/community/posts/:id/match': ['PLAYER', 'OWNER', 'ADMIN'],
+  'POST /api/community/posts': ['PLAYER', 'OWNER', 'ADMIN'],
+  'GET /api/community/posts/:id': ['PLAYER', 'OWNER', 'ADMIN'],
+  'PUT /api/community/posts/:id': ['PLAYER', 'OWNER', 'ADMIN'],
+  'POST /api/community/requests': ['PLAYER', 'OWNER', 'ADMIN'],
+  'GET /api/community/requests': ['PLAYER', 'OWNER', 'ADMIN'],
+  'PUT /api/community/requests/:id': ['PLAYER', 'OWNER', 'ADMIN'],
+  'GET /api/community/conversations': ['PLAYER', 'OWNER', 'ADMIN'],
+  'GET /api/community/conversations/:id/messages': ['PLAYER', 'OWNER', 'ADMIN'],
+  'POST /api/community/conversations/:id/messages': ['PLAYER', 'OWNER', 'ADMIN'],
 
   // Profile - All authenticated users
   'GET /api/profile': ['PLAYER', 'OWNER', 'ADMIN'],

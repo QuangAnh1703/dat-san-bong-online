@@ -39,6 +39,7 @@ tags:
   - name: San con
   - name: Bang gia
   - name: Dat san
+  - name: Cong dong - Ghep doi
   - name: Quan tri - Duyet san
   - name: Quan tri - Duyet Chu san
   - name: Quan tri - Quan ly Nguoi dung
@@ -705,6 +706,292 @@ paths:
                 type: object
                 properties:
                   released: { type: integer, example: 3 }
+
+  /api/community/posts:
+    get:
+      tags: [Cong dong - Ghep doi]
+      summary: Danh sach bai dang tim doi va ghep chan le
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [TEAM_FINDS_TEAM, TEAM_FINDS_PLAYER, PLAYER_FINDS_TEAM]
+          description: Loai bai dang
+        - name: district
+          in: query
+          schema: { type: string }
+          description: Ma quan/huyen
+        - name: skill_level
+          in: query
+          schema:
+            type: string
+            enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO]
+        - name: date_from
+          in: query
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Danh sach bai dang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MatchPost' }
+    post:
+      tags: [Cong dong - Ghep doi]
+      summary: Tao bai dang tim doi hoac tim nguoi choi
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMatchPostRequest' }
+      responses:
+        '201':
+          description: Bai dang tao thanh cong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Post created }
+                  data: { $ref: '#/components/schemas/MatchPost' }
+
+  /api/community/posts/{id}:
+    get:
+      tags: [Cong dong - Ghep doi]
+      summary: Chi tiet bai dang va danh sach yeu cau
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Chi tiet bai dang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/MatchPostDetail' }
+    put:
+      tags: [Cong dong - Ghep doi]
+      summary: Cap nhat trang thai bai dang (OPEN/MATCHED/CLOSED)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [OPEN, MATCHED, CLOSED, EXPIRED]
+      responses:
+        '200':
+          description: Bai dang da cap nhat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/MatchPost' }
+
+  /api/community/requests:
+    post:
+      tags: [Cong dong - Ghep doi]
+      summary: Gui yeu cau tham gia bai dang
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id]
+              properties:
+                post_id:  { type: integer }
+                message:  { type: string, description: Loi nhan gui cho tac gia bai }
+      responses:
+        '201':
+          description: Yeu cau da gui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/JoinRequest' }
+    get:
+      tags: [Cong dong - Ghep doi]
+      summary: Danh sach yeu cau cua toi hoac tren bai dang
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: post_id
+          in: query
+          schema: { type: integer }
+          description: Chi xem yeu cau tren mot bai dang (chi tac gia bai dang)
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, ACCEPTED, REJECTED, EXPIRED, CANCELLED]
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Danh sach yeu cau
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/JoinRequest' }
+
+  /api/community/requests/{id}:
+    put:
+      tags: [Cong dong - Ghep doi]
+      summary: Duyet hoac tu choi yeu cau (chi cho tac gia bai dang)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [ACCEPTED, REJECTED]
+      responses:
+        '200':
+          description: Yeu cau da cap nhat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/JoinRequest' }
+
+  /api/community/conversations:
+    get:
+      tags: [Cong dong - Ghep doi]
+      summary: Danh sach hoi thoai cua toi
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sach hoi thoai
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Conversation' }
+
+  /api/community/conversations/{id}/messages:
+    get:
+      tags: [Cong dong - Ghep doi]
+      summary: Danh sach tin nhan trong cuoc hoi thoai
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Danh sach tin nhan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Message' }
+    post:
+      tags: [Cong dong - Ghep doi]
+      summary: Gui tin nhan
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        '201':
+          description: Tin nhan da gui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/Message' }
 
   /api/admin/venues/pending:
     get:
@@ -1432,3 +1719,84 @@ components:
                   amount:       { type: integer }
                   provider_ref: { type: string }
                   paid_at:      { type: string, format: date-time }
+
+    MatchPost:
+      type: object
+      properties:
+        id:             { type: integer }
+        type:           { type: string, enum: [TEAM_FINDS_TEAM, TEAM_FINDS_PLAYER, PLAYER_FINDS_TEAM] }
+        status:         { type: string, enum: [OPEN, MATCHED, CLOSED, EXPIRED] }
+        author_user_id: { type: integer }
+        team_id:        { type: integer, nullable: true }
+        booking_id:     { type: integer, nullable: true }
+        district_code:  { type: string }
+        play_date:      { type: string, format: date }
+        time_span:      { type: object, nullable: true }
+        required_level: { type: string, enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO] }
+        deal_note:      { type: string, nullable: true, example: 'Chia 5-5' }
+        slots_needed:   { type: integer, nullable: true }
+        slots_filled:   { type: integer, nullable: true }
+        cost_kind:      { type: string, enum: [FREE, FIXED, VOLUNTARY], nullable: true }
+        cost_amount:    { type: number, nullable: true }
+        content:        { type: string }
+        expires_at:     { type: string, format: date-time }
+        created_at:     { type: string, format: date-time }
+        closed_at:      { type: string, format: date-time, nullable: true }
+
+    MatchPostDetail:
+      allOf:
+        - $ref: '#/components/schemas/MatchPost'
+        - type: object
+          properties:
+            requests:
+              type: array
+              items: { $ref: '#/components/schemas/JoinRequest' }
+
+    CreateMatchPostRequest:
+      type: object
+      required: [type, district_code, play_date, expires_at]
+      properties:
+        type:           { type: string, enum: [TEAM_FINDS_TEAM, TEAM_FINDS_PLAYER, PLAYER_FINDS_TEAM] }
+        team_id:        { type: integer, description: "Bat buoc neu type bat dau bang TEAM_" }
+        booking_id:     { type: integer, description: "Bat buoc neu type bat dau bang TEAM_" }
+        district_code:  { type: string }
+        play_date:      { type: string, format: date }
+        time_span:      { type: object, nullable: true }
+        required_level: { type: string, enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO], default: INTERMEDIATE }
+        deal_note:      { type: string, nullable: true }
+        slots_needed:   { type: integer, description: "Bat buoc neu type=TEAM_FINDS_PLAYER" }
+        cost_kind:      { type: string, enum: [FREE, FIXED, VOLUNTARY], description: "Bat buoc neu type=TEAM_FINDS_PLAYER" }
+        cost_amount:    { type: number, nullable: true }
+        content:        { type: string }
+        expires_at:     { type: string, format: date-time }
+
+    JoinRequest:
+      type: object
+      properties:
+        id:                 { type: integer }
+        post_id:            { type: integer }
+        requester_user_id:  { type: integer }
+        requester_team_id:  { type: integer, nullable: true }
+        message:            { type: string }
+        status:             { type: string, enum: [PENDING, ACCEPTED, REJECTED, EXPIRED, CANCELLED] }
+        level_warning_ack:  { type: boolean }
+        responded_at:       { type: string, format: date-time, nullable: true }
+        created_at:         { type: string, format: date-time }
+
+    Conversation:
+      type: object
+      properties:
+        id:              { type: integer }
+        match_post_id:   { type: integer, nullable: true }
+        booking_id:      { type: integer, nullable: true }
+        message_count:   { type: integer }
+        created_at:      { type: string, format: date-time }
+
+    Message:
+      type: object
+      properties:
+        id:              { type: integer }
+        conversation_id: { type: integer }
+        sender_id:       { type: integer }
+        content:         { type: string }
+        created_at:      { type: string, format: date-time }
