@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import EmptyState from '../../components/ui/EmptyState';
 import { listPosts, sendJoinRequest } from '../../services/community';
-import { listPosts as listVenuePosts } from '../../services/venues';
 
 /** WF-07 - Tim doi giao huu */
 export default function FindTeamPage() {

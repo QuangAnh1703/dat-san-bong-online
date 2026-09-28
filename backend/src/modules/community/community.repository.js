@@ -1,6 +1,5 @@
 'use strict';
-const { query, withTransaction } = require('../../db');
-const { AppError } = require('../../lib/errors');
+const { query } = require('../../db');
 
 async function createPost({
   type,
@@ -87,12 +86,18 @@ async function listPosts({
 
 async function getPostById(id) {
   const result = await query(
-    `SELECT mp.*,
+    `SELECT mp.id, mp.type, mp.status, mp.author_user_id, mp.team_id, mp.booking_id,
+            mp.district_code, mp.play_date, mp.time_span, mp.required_level, mp.deal_note,
+            mp.slots_needed, mp.slots_filled, mp.cost_kind, mp.cost_amount, mp.content,
+            mp.expires_at, mp.created_at, mp.closed_at,
             json_agg(json_build_object('id', jr.id, 'requester_user_id', jr.requester_user_id, 'status', jr.status)) FILTER (WHERE jr.id IS NOT NULL) AS requests
      FROM match_post mp
      LEFT JOIN join_request jr ON jr.post_id = mp.id
      WHERE mp.id = $1
-     GROUP BY mp.id`,
+     GROUP BY mp.id, mp.type, mp.status, mp.author_user_id, mp.team_id, mp.booking_id,
+              mp.district_code, mp.play_date, mp.time_span, mp.required_level, mp.deal_note,
+              mp.slots_needed, mp.slots_filled, mp.cost_kind, mp.cost_amount, mp.content,
+              mp.expires_at, mp.created_at, mp.closed_at`,
     [id]
   );
   return result.rows[0];
