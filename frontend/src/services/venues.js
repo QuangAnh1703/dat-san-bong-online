@@ -15,7 +15,7 @@ export function getVenues({ district, q, fieldType, maxPrice, minRating, ameniti
   return api.get('/api/venues' + (qs ? `?${qs}` : '')).then((r) => r.data ?? []);
 }
 
-export const getVenue = (id) => api.get(`/api/venues/${id}`);
+export const getVenue = (id) => api.get(`/api/venues/${id}`).then(r => ({ data: r }));
 
 export const getFieldSchedule = (fieldId, date) =>
   api.get(`/api/fields/${fieldId}/schedule?date=${date}`);

@@ -5,6 +5,7 @@ import VenueCard from '../../components/ui/VenueCard';
 import SkeletonGrid from '../../components/ui/SkeletonGrid';
 import EmptyState from '../../components/ui/EmptyState';
 import Banner from '../../components/ui/Banner';
+import FlashSale from '../home/FlashSale';
 import { useVenues } from '../home/useVenues';
 import { today } from '../../lib/format';
 
@@ -121,6 +122,9 @@ export default function SearchPage() {
             </div>
           </div>
         </div>
+
+        {/* Flash Sale */}
+        <FlashSale />
       </section>
     </main>
   );
