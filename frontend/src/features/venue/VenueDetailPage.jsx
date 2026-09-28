@@ -127,7 +127,11 @@ export default function VenueDetailPage() {
             </div>
 
             <div className="amenities">
-              {amenities.map((a) => <span className="tag" key={a}>{a}</span>)}
+              {amenities.map((a) => (
+                <span className="tag" key={a.code || a}>
+                  {a.name || a}
+                </span>
+              ))}
             </div>
 
             {description && <p className="description">{description}</p>}
