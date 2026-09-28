@@ -5,6 +5,7 @@ import Banner from '../../components/ui/Banner';
 import EmptyState from '../../components/ui/EmptyState';
 import FieldSchedule from './FieldSchedule';
 import ReviewSection from './ReviewSection';
+import BookingModal from './BookingModal';
 import { getVenue, getFieldSchedule } from '../../services/venues';
 import { vnd } from '../../lib/format';
 import { today } from '../../lib/format';
@@ -19,6 +20,7 @@ export default function VenueDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedField, setSelectedField] = useState(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -53,6 +55,10 @@ export default function VenueDetailPage() {
     } catch (err) {
       console.error('[API] Error loading schedule:', err);
     }
+  };
+
+  const handleBookingSuccess = (bookingCode) => {
+    navigate(`/thanh-toan/${bookingCode}`);
   };
 
   if (loading) {
@@ -194,7 +200,11 @@ export default function VenueDetailPage() {
                   <span className="contact-value">{address}</span>
                 </div>
               )}
-              <button className="btn-primary" style={{ width: '100%', marginTop: 16 }}>
+              <button
+                className="btn-primary"
+                style={{ width: '100%', marginTop: 16 }}
+                onClick={() => setShowBookingModal(true)}
+              >
                 Dat san ngay
               </button>
             </div>
@@ -210,6 +220,15 @@ export default function VenueDetailPage() {
       <section className="wrap">
         <ReviewSection venueId={id} />
       </section>
+
+      {/* Booking Modal */}
+      <BookingModal
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        field={venue?.fields?.find(f => f.id === selectedField)}
+        venue={venue}
+        onSuccess={handleBookingSuccess}
+      />
     </main>
   );
 }
