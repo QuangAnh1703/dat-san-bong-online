@@ -13,14 +13,11 @@ export function AuthProvider({ children }) {
       const stored = localStorage.getItem('auth_token');
       const storedUser = localStorage.getItem('auth_user');
 
-      console.log('[AuthContext] Init auth:', { hasToken: !!stored, hasUser: !!storedUser });
-
       if (stored && storedUser) {
         setToken(stored);
         try {
           setUser(JSON.parse(storedUser));
         } catch (err) {
-          console.warn('[AuthContext] Failed to parse stored user:', err.message);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
           setLoading(false);
@@ -29,15 +26,12 @@ export function AuthProvider({ children }) {
 
         // Sync user data from server to ensure consistency
         try {
-          console.log('[AuthContext] Syncing user profile, token:', stored.substring(0, 20) + '...');
           const response = await api.get('/api/profile', {
             headers: { Authorization: `Bearer ${stored}` }
           });
-          console.log('[AuthContext] Profile synced:', response.data);
           setUser(response.data);
           localStorage.setItem('auth_user', JSON.stringify(response.data));
         } catch (err) {
-          console.warn('[AuthContext] Failed to sync user profile:', err.message);
           // Still keep the user logged in with cached data if sync fails
         }
       }
@@ -48,11 +42,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (data) => {
-    console.log('[AuthContext.login] Saving user:', { id: data.user.id, name: data.user.full_name, phone: data.user.phone });
-    setUser(data.user);
+    const userData = data.user || data;
+    setUser(userData);
     setToken(data.access_token);
     localStorage.setItem('auth_token', data.access_token);
-    localStorage.setItem('auth_user', JSON.stringify(data.user));
+    localStorage.setItem('auth_user', JSON.stringify(userData));
   };
 
   const logout = () => {
