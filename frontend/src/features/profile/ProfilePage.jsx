@@ -1,17 +1,18 @@
 import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 
 /** WF-09 - Ho so & diem uy tin */
 export default function ProfilePage() {
-  const [user] = useState({
+  const { user: authUser } = useAuth();
+
+  const user = authUser || {
     id: 'USR001',
-    name: 'Tran Van A',
+    full_name: 'Tran Van A',
     email: 'tranvana@example.com',
     phone: '0901 234 567',
-    age: 26,
-    district: 'Cau Giay',
+    district_code: 'Cau Giay',
     bio: 'Nguoi choi bong da, thich giao huu va ro ren',
-    avatar: 'T',
-  });
+  };
 
   const [reputation] = useState({
     totalBookings: 45,
@@ -39,17 +40,20 @@ export default function ProfilePage() {
     },
   ]);
 
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   return (
     <main className="profile-page">
       <section className="wrap">
         <div className="profile-header">
-          <div className="profile-avatar">{user.avatar}</div>
+          <div className="profile-avatar">{getInitials(user.full_name)}</div>
           <div className="profile-info">
-            <h1>{user.name}</h1>
+            <h1>{user.full_name || user.name}</h1>
             <div className="profile-meta">
-              <span>{user.age} tuoi</span>
-              <span className="sep">·</span>
-              <span>{user.district}</span>
+              <span>{user.district_code || user.district}</span>
               <span className="sep">·</span>
               <span>{user.phone}</span>
             </div>
