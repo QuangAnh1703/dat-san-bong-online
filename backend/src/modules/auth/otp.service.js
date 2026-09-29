@@ -17,15 +17,15 @@ function hashOtp(otp) {
   return crypto.createHash('sha256').update(otp).digest('hex');
 }
 
-/** Store OTP in Redis with attempt tracking, send via email */
-async function storeOtp(email, purpose = 'REGISTER') {
+/** Store OTP in Redis with attempt tracking, send via email or SMS (mocked) */
+async function storeOtp(contact, purpose = 'REGISTER') {
   const otp = generateOtp();
   const hash = hashOtp(otp);
-  const key = `otp:${email}:${purpose}`;
-  const attemptsKey = `otp:attempts:${email}:${purpose}`;
+  const key = `otp:${contact}:${purpose}`;
+  const attemptsKey = `otp:attempts:${contact}:${purpose}`;
 
   // Check if locked out
-  const locked = await client.get(`otp:locked:${email}:${purpose}`);
+  const locked = await client.get(`otp:locked:${contact}:${purpose}`);
   if (locked) {
     throw new Error(`OTP_LOCKED_${Math.ceil(Number(locked))}s`);
   }
@@ -35,18 +35,26 @@ async function storeOtp(email, purpose = 'REGISTER') {
   // Reset attempts counter
   await client.del(attemptsKey);
 
-  // Send email
-  await sendOtpEmail(email, otp);
-  console.log(`[OTP] Sent to ${email}`);
+  // Determine if email or phone
+  const isEmail = contact.includes('@');
 
-  return { email, message: 'OTP sent to email' };
+  if (isEmail) {
+    // Send email
+    await sendOtpEmail(contact, otp);
+    console.log(`[OTP] Sent to email ${contact}`);
+  } else {
+    // Mock SMS for phone (in production, integrate with SMS service)
+    console.log(`[OTP] Sent to phone ${contact.replace(/\d{3}$/, '***')} (mocked SMS: ${otp})`);
+  }
+
+  return { contact, message: isEmail ? 'OTP sent to email' : 'OTP sent to phone' };
 }
 
 /** Verify OTP and track failed attempts */
-async function verifyOtp(email, otp, purpose = 'REGISTER') {
-  const key = `otp:${email}:${purpose}`;
-  const attemptsKey = `otp:attempts:${email}:${purpose}`;
-  const lockKey = `otp:locked:${email}:${purpose}`;
+async function verifyOtp(contact, otp, purpose = 'REGISTER') {
+  const key = `otp:${contact}:${purpose}`;
+  const attemptsKey = `otp:attempts:${contact}:${purpose}`;
+  const lockKey = `otp:locked:${contact}:${purpose}`;
 
   // Check if locked
   const locked = await client.get(lockKey);
