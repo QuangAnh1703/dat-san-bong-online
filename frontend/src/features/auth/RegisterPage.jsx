@@ -137,7 +137,9 @@ export function RegisterPage() {
           full_name: fullName,
           district_code: districtCode || undefined,
         });
+        console.log('[RegisterPage] Phone registration response:', result);
       }
+      console.log('[RegisterPage] Calling authLogin with:', result);
       authLogin(result);
       navigate('/');
     } catch (err) {
