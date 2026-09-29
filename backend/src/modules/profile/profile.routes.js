@@ -56,6 +56,7 @@ router.use(requireAuthenticated);
 router.get('/', async (req, res, next) => {
   try {
     const userId = req.user.id;
+    console.log('[GET /api/profile] userId:', userId);
 
     const r = await query(
       `SELECT u.id, u.email, u.phone, u.role, u.status, u.phone_verified,
