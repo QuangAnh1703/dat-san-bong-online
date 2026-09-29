@@ -18,6 +18,7 @@ import { OwnerDashboard } from './features/owner/OwnerDashboard';
 import PricingManagement from './features/pricing/PricingManagement';
 import ComingSoonPage from './pages/ComingSoonPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ClearCache from './pages/ClearCache';
 
 /**
  * Mot route cho moi wireframe. Man hinh chua lam dung ComingSoonPage
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: 'auth', element: <UnifiedAuthPage /> },
       { path: 'auth/login', element: <UnifiedAuthPage /> },
       { path: 'auth/register', element: <RegisterPage /> },
+      { path: 'clear-cache', element: <ClearCache /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
       { path: 'auth/google-callback', element: <GoogleCallbackPage /> },
       { path: 'onboarding', element: <OnboardingPage /> },
