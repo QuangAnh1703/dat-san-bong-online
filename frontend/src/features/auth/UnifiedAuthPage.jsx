@@ -255,13 +255,9 @@ export function UnifiedAuthPage() {
             <div className={styles.footer}>
               <p>
                 Chưa có tài khoản?{' '}
-                <button
-                  type="button"
-                  className={styles.switchBtn}
-                  onClick={handleSwitchMode}
-                >
+                <a href="/auth/register" className={styles.switchBtn}>
                   Đăng ký ngay
-                </button>
+                </a>
               </p>
             </div>
           </div>

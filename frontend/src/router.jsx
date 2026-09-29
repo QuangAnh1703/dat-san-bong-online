@@ -11,6 +11,7 @@ import MatchmakingPage from './features/matchmaking/MatchmakingPage';
 import ProfilePage from './features/profile/ProfilePage';
 import { GoogleCallbackPage } from './features/auth/GoogleCallbackPage';
 import { UnifiedAuthPage } from './features/auth/UnifiedAuthPage';
+import { RegisterPage } from './features/auth/RegisterPage';
 import { OnboardingPage } from './features/auth/OnboardingPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { OwnerDashboard } from './features/owner/OwnerDashboard';
@@ -30,7 +31,7 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'auth', element: <UnifiedAuthPage /> },
       { path: 'auth/login', element: <UnifiedAuthPage /> },
-      { path: 'auth/register', element: <UnifiedAuthPage /> },
+      { path: 'auth/register', element: <RegisterPage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
       { path: 'auth/google-callback', element: <GoogleCallbackPage /> },
       { path: 'onboarding', element: <OnboardingPage /> },
