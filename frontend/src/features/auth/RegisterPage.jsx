@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { requestOtp, verifyOtp, registerWithOtp } from '../../services/auth';
+import { requestOtp, verifyOtp, registerWithOtp, registerWithPhone } from '../../services/auth';
 import styles from './AuthPages.module.css';
 
 const STEPS = {
@@ -53,16 +53,17 @@ export function RegisterPage() {
           return;
         }
         await requestOtp({ email });
+        setStep(STEPS.OTP);
+        setOtpResendTime(60);
       } else {
+        // Phone registration: skip OTP, go directly to password step
         if (!phoneNumber) {
           setError('Vui lòng nhập số điện thoại');
           setLoading(false);
           return;
         }
-        await requestOtp({ phone_number: phoneNumber });
+        setStep(STEPS.PASSWORD);
       }
-      setStep(STEPS.OTP);
-      setOtpResendTime(60);
     } catch (err) {
       setError(err.message || 'Yêu cầu OTP thất bại');
     } finally {
@@ -114,13 +115,29 @@ export function RegisterPage() {
       return;
     }
 
+    if (!fullName.trim()) {
+      setError('Vui lòng nhập họ và tên');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const result = await registerWithOtp({
-        temp_token: tempToken,
-        password,
-        full_name: fullName,
-        district_code: districtCode || undefined,
-      });
+      let result;
+      if (contactType === CONTACT_TYPE.EMAIL) {
+        result = await registerWithOtp({
+          temp_token: tempToken,
+          password,
+          full_name: fullName,
+          district_code: districtCode || undefined,
+        });
+      } else {
+        result = await registerWithPhone({
+          phone_number: phoneNumber,
+          password,
+          full_name: fullName,
+          district_code: districtCode || undefined,
+        });
+      }
       authLogin(result);
       navigate('/');
     } catch (err) {
@@ -288,7 +305,9 @@ export function RegisterPage() {
 
         {step === STEPS.PASSWORD && (
           <form onSubmit={handleRegister} className={styles.form}>
-            <p className={styles.stepInfo}>Bước 3/3: Tạo mật khẩu</p>
+            <p className={styles.stepInfo}>
+              {contactType === CONTACT_TYPE.EMAIL ? 'Bước 3/3: Tạo mật khẩu' : 'Bước 2/2: Tạo mật khẩu'}
+            </p>
 
             <div className={styles.formGroup}>
               <label htmlFor="fullName">Họ và tên</label>

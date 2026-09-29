@@ -32,6 +32,16 @@ export async function registerWithOtp({ temp_token, password, full_name, distric
   });
 }
 
+export async function registerWithPhone({ phone_number, password, full_name, district_code, role = 'PLAYER' }) {
+  return api.post('/api/auth/register-with-phone', {
+    phone_number,
+    password,
+    full_name,
+    district_code,
+    role,
+  });
+}
+
 export function getGoogleLoginUrl() {
   const base = import.meta.env.VITE_API_URL || '';
   return `${base}/api/auth/google`;
