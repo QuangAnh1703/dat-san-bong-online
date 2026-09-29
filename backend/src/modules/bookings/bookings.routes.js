@@ -13,6 +13,45 @@ function makeCode() {
   return `BK${ymd}${rnd}`;
 }
 
+// GET /api/bookings - Lay danh sach booking cua user hien tai
+router.get('/', async (req, res, next) => {
+  try {
+    // Lay user_id tu request (co the tu JWT token hoac session)
+    // Cho phep truy van khong co authentication neu co user_id trong query
+    let userId = req.query.user_id;
+    if (!userId && req.user) {
+      userId = req.user.id;
+    }
+
+    if (!userId) {
+      // Neu khong co user_id, tra ve danh sach rong (fallback cho demo)
+      return res.json({ count: 0, data: [] });
+    }
+
+    const result = await query(
+      `SELECT b.*, v.name AS venue_name
+         FROM booking b JOIN venue v ON v.id = b.venue_id
+        WHERE b.user_id = $1
+        ORDER BY (SELECT MAX(bs.play_date) FROM booking_slot bs WHERE bs.booking_id = b.id) DESC
+        LIMIT 100`, [userId]);
+
+    // Load slots cho moi booking
+    const bookings = await Promise.all(result.rows.map(async (b) => {
+      const slots = await query(
+        `SELECT bs.id, f.name AS field_name, bs.play_date,
+                lower(bs.time_range) AS start_at, upper(bs.time_range) AS end_at,
+                bs.price, bs.status
+           FROM booking_slot bs JOIN field f ON f.id = bs.field_id
+          WHERE bs.booking_id = $1 ORDER BY bs.play_date, lower(bs.time_range)`, [b.id]);
+      return { ...b, slots: slots.rows };
+    }));
+
+    res.json({ count: bookings.length, data: bookings });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/bookings
 // body: { field_id, play_date, start, end, user_id? , guest_name?, guest_phone?, note? }
 router.post('/', async (req, res, next) => {
@@ -138,6 +177,37 @@ router.post('/:code/cancel', async (req, res, next) => {
       return { code: req.params.code, status: 'CANCELLED_BY_USER', released_slots: s.rowCount };
     });
     res.json(out);
+  } catch (err) { next(err); }
+});
+
+// POST /api/bookings/:code/rate - Danh gia booking
+router.post('/:code/rate', async (req, res, next) => {
+  try {
+    const { rating, comment } = req.body || {};
+    const { code } = req.params;
+
+    requireFields(req.body, ['rating']);
+
+    if (rating < 1 || rating > 5) {
+      throw new AppError('INVALID_RATING', { message: 'Rating phai tu 1-5' });
+    }
+
+    const b = await query(
+      `SELECT id, status FROM booking WHERE code = $1`, [code]);
+    if (b.rowCount === 0) throw new AppError('BOOKING_NOT_FOUND', { details: { code } });
+
+    const booking = b.rows[0];
+    if (!['COMPLETED', 'CONFIRMED'].includes(booking.status)) {
+      throw new AppError('CANNOT_RATE', { message: 'Chi co the danh gia don hoan thanh' });
+    }
+
+    // Update rating trong booking hoac tao record rating rieng
+    const result = await query(
+      `UPDATE booking SET rating = $1, rating_comment = $2, rated_at = now()
+       WHERE code = $3 RETURNING code, rating, rating_comment, rated_at`,
+      [rating, comment || null, code]);
+
+    res.json(result.rows[0]);
   } catch (err) { next(err); }
 });
 

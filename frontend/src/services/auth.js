@@ -8,12 +8,18 @@ export async function login({ email, phone_number, password }) {
   });
 }
 
-export async function requestOtp({ email }) {
-  return api.post('/api/auth/request-otp', { email });
+export async function requestOtp({ email, phone_number }) {
+  const payload = {};
+  if (email) payload.email = email;
+  if (phone_number) payload.phone_number = phone_number;
+  return api.post('/api/auth/request-otp', payload);
 }
 
-export async function verifyOtp({ email, otp }) {
-  return api.post('/api/auth/verify-otp', { email, otp });
+export async function verifyOtp({ email, phone_number, otp }) {
+  const payload = { otp };
+  if (email) payload.email = email;
+  if (phone_number) payload.phone_number = phone_number;
+  return api.post('/api/auth/verify-otp', payload);
 }
 
 export async function registerWithOtp({ temp_token, password, full_name, district_code, role = 'PLAYER' }) {

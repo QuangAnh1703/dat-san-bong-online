@@ -10,11 +10,18 @@ const STEPS = {
   PASSWORD: 'password',
 };
 
+const CONTACT_TYPE = {
+  EMAIL: 'email',
+  PHONE: 'phone',
+};
+
 export function RegisterPage() {
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
+  const [contactType, setContactType] = useState(CONTACT_TYPE.EMAIL);
   const [step, setStep] = useState(STEPS.EMAIL);
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [tempToken, setTempToken] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +46,21 @@ export function RegisterPage() {
     setError('');
 
     try {
-      await requestOtp({ email });
+      if (contactType === CONTACT_TYPE.EMAIL) {
+        if (!email) {
+          setError('Vui lòng nhập email');
+          setLoading(false);
+          return;
+        }
+        await requestOtp({ email });
+      } else {
+        if (!phoneNumber) {
+          setError('Vui lòng nhập số điện thoại');
+          setLoading(false);
+          return;
+        }
+        await requestOtp({ phone_number: phoneNumber });
+      }
       setStep(STEPS.OTP);
       setOtpResendTime(60);
     } catch (err) {
@@ -55,7 +76,10 @@ export function RegisterPage() {
     setError('');
 
     try {
-      const result = await verifyOtp({ email, otp });
+      const payload = contactType === CONTACT_TYPE.EMAIL
+        ? { email, otp }
+        : { phone_number: phoneNumber, otp };
+      const result = await verifyOtp(payload);
       setTempToken(result.temp_token);
       setStep(STEPS.PASSWORD);
       setOtp('');
@@ -110,7 +134,11 @@ export function RegisterPage() {
     setOtpResendTime(60);
     setError('');
     try {
-      await requestOtp({ email });
+      if (contactType === CONTACT_TYPE.EMAIL) {
+        await requestOtp({ email });
+      } else {
+        await requestOtp({ phone_number: phoneNumber });
+      }
       setOtpAttempts(3);
     } catch (err) {
       setError(err.message || 'Không thể gửi lại OTP');
@@ -129,24 +157,60 @@ export function RegisterPage() {
 
         {step === STEPS.EMAIL && (
           <form onSubmit={handleRequestOtp} className={styles.form}>
-            <p className={styles.stepInfo}>Bước 1/3: Xác nhận email</p>
+            <p className={styles.stepInfo}>Bước 1/3: Xác nhận liên hệ</p>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError('');
-                }}
-                required
-                disabled={loading}
-                autoFocus
-              />
+            <div className={styles.contactTypeToggle}>
+              <button
+                type="button"
+                onClick={() => setContactType(CONTACT_TYPE.EMAIL)}
+                className={contactType === CONTACT_TYPE.EMAIL ? styles.active : ''}
+              >
+                📧 Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setContactType(CONTACT_TYPE.PHONE)}
+                className={contactType === CONTACT_TYPE.PHONE ? styles.active : ''}
+              >
+                📱 Số điện thoại
+              </button>
             </div>
+
+            {contactType === CONTACT_TYPE.EMAIL && (
+              <div className={styles.formGroup}>
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError('');
+                  }}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {contactType === CONTACT_TYPE.PHONE && (
+              <div className={styles.formGroup}>
+                <label htmlFor="phone">Số điện thoại</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  placeholder="0987654321"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value.replace(/\D/g, ''));
+                    setError('');
+                  }}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            )}
 
             <button
               type="submit"
@@ -162,7 +226,9 @@ export function RegisterPage() {
           <form onSubmit={handleVerifyOtp} className={styles.form}>
             <p className={styles.stepInfo}>Bước 2/3: Xác nhận OTP</p>
             <p className={styles.helpText}>
-              Chúng tôi đã gửi mã xác nhận đến <strong>{email}</strong>
+              Chúng tôi đã gửi mã xác nhận đến <strong>
+                {contactType === CONTACT_TYPE.EMAIL ? email : phoneNumber}
+              </strong>
             </p>
 
             <div className={styles.formGroup}>
@@ -209,10 +275,12 @@ export function RegisterPage() {
                 onClick={() => {
                   setStep(STEPS.EMAIL);
                   setError('');
+                  setOtp('');
+                  setOtpAttempts(3);
                 }}
                 className={styles.link}
               >
-                Thay đổi email
+                Thay đổi {contactType === CONTACT_TYPE.EMAIL ? 'email' : 'số điện thoại'}
               </button>
             </div>
           </form>

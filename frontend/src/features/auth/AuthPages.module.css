@@ -248,3 +248,33 @@
   text-decoration: underline;
   color: #1765a0;
 }
+
+.contactTypeToggle {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.contactTypeToggle button {
+  flex: 1;
+  padding: 12px 12px;
+  border: 2px solid #dadce0;
+  border-radius: 6px;
+  background: var(--bg-primary, white);
+  color: var(--text-primary, #202124);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.contactTypeToggle button:hover {
+  border-color: var(--primary, #1f71b8);
+  background: #f0f7ff;
+}
+
+.contactTypeToggle button.active {
+  border-color: var(--primary, #1f71b8);
+  background: var(--primary, #1f71b8);
+  color: white;
+}

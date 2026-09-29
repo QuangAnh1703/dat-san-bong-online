@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -8,13 +9,30 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('auth_user');
-    if (stored && storedUser) {
-      setToken(stored);
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      const stored = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('auth_user');
+
+      if (stored && storedUser) {
+        setToken(stored);
+        setUser(JSON.parse(storedUser));
+
+        // Sync user data from server to ensure consistency
+        try {
+          const response = await api.get('/api/profile', {
+            headers: { Authorization: `Bearer ${stored}` }
+          });
+          setUser(response.data);
+          localStorage.setItem('auth_user', JSON.stringify(response.data));
+        } catch (err) {
+          console.warn('Failed to sync user profile:', err.message);
+          // Still keep the user logged in with cached data if sync fails
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = (data) => {

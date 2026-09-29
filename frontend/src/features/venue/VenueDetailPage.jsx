@@ -207,7 +207,10 @@ export default function VenueDetailPage() {
               <button
                 className="btn-primary"
                 style={{ width: '100%', marginTop: 16 }}
-                onClick={() => setShowBookingModal(true)}
+                onClick={() => {
+                  console.log('✓ Booking button clicked, opening modal...');
+                  setShowBookingModal(true);
+                }}
               >
                 Dat san ngay
               </button>

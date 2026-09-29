@@ -62,20 +62,46 @@ router.post('/login', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/auth/request-otp  body: { email }
-// Request OTP for registration, OTP sent via email
+// POST /api/auth/request-otp  body: { email OR phone_number }
+// Request OTP for registration, OTP sent via email or SMS (mocked SMS)
 router.post('/request-otp', async (req, res, next) => {
   try {
-    const { email } = req.body || {};
-    requireFields(req.body, ['email']);
+    const { email, phone_number } = req.body || {};
 
-    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+    if (!email && !phone_number) {
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'email/phone_number', reason: 'Email hoặc số điện thoại là bắt buộc' }
+      });
+    }
 
-    const existing = await findByEmail(email);
-    if (existing) throw new AppError('EMAIL_TAKEN');
+    let contact = null;
+    let contactType = null;
 
-    await storeOtp(email, 'REGISTER');
-    res.json({ message: 'OTP sent to email', email: email.replace(/.{1,}@/, '*@') });
+    // Email registration
+    if (email) {
+      if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+      const existing = await findByEmail(email);
+      if (existing) throw new AppError('EMAIL_TAKEN');
+      contact = email;
+      contactType = 'email';
+    }
+    // Phone registration
+    else if (phone_number) {
+      const PHONE_RE = /^0[0-9]{9}$/;
+      if (!PHONE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
+      const existing = await findByPhone(phone_number);
+      if (existing) throw new AppError('PHONE_TAKEN');
+      contact = phone_number;
+      contactType = 'phone';
+    }
+
+    await storeOtp(contact, 'REGISTER');
+
+    if (contactType === 'email') {
+      res.json({ message: 'OTP sent to email', contact: contact.replace(/.{1,}@/, '*@') });
+    } else {
+      res.json({ message: 'OTP sent to phone (SMS)', contact: contact.replace(/\d{3}$/, '***') });
+    }
   } catch (err) {
     if (err.message.startsWith('OTP_LOCKED')) {
       const seconds = err.message.split('_')[2];
@@ -86,19 +112,43 @@ router.post('/request-otp', async (req, res, next) => {
   }
 });
 
-// POST /api/auth/verify-otp  body: { email, otp }
+// POST /api/auth/verify-otp  body: { email OR phone_number, otp }
 // Verify OTP - returns temp token valid for 10 minutes
 router.post('/verify-otp', async (req, res, next) => {
   try {
-    const { email, otp } = req.body || {};
-    requireFields(req.body, ['email', 'otp']);
+    const { email, phone_number, otp } = req.body || {};
+    requireFields(req.body, ['otp']);
 
-    if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+    if (!email && !phone_number) {
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'email/phone_number', reason: 'Email hoặc số điện thoại là bắt buộc' }
+      });
+    }
 
-    await verifyOtp(email, otp, 'REGISTER');
+    let contact = null;
+    let contactType = null;
+
+    if (email) {
+      if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
+      contact = email;
+      contactType = 'email';
+    } else if (phone_number) {
+      const PHONE_RE = /^0[0-9]{9}$/;
+      if (!PHONE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
+      contact = phone_number;
+      contactType = 'phone';
+    }
+
+    await verifyOtp(contact, otp, 'REGISTER');
 
     // Return temp token (valid for 10 minutes to register)
-    const tempToken = Buffer.from(JSON.stringify({ email, verified_at: Date.now() })).toString('base64');
+    const tempData = { verified_at: Date.now(), contact_type: contactType };
+    if (contactType === 'email') {
+      tempData.email = contact;
+    } else {
+      tempData.phone_number = contact;
+    }
+    const tempToken = Buffer.from(JSON.stringify(tempData)).toString('base64');
     res.json({ temp_token: tempToken });
   } catch (err) {
     if (err.message === 'OTP_EXPIRED') {
@@ -116,7 +166,7 @@ router.post('/verify-otp', async (req, res, next) => {
 });
 
 // POST /api/auth/register-with-otp  body: { temp_token, password, full_name, district_code?, role? }
-// Register after OTP verification
+// Register after OTP verification (email or phone)
 // role: 'PLAYER' (default) or 'OWNER'
 router.post('/register-with-otp', async (req, res, next) => {
   try {
@@ -145,18 +195,35 @@ router.post('/register-with-otp', async (req, res, next) => {
       throw new AppError('INVALID_TEMP_TOKEN');
     }
 
-    const { email } = verified;
-    const existing = await findByEmail(email);
-    if (existing) throw new AppError('EMAIL_TAKEN');
-
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await createUserWithEmail({
-      email,
-      passwordHash,
-      fullName: full_name,
-      districtCode: district_code,
-      role,
-    });
+    let user;
+
+    // Register with email
+    if (verified.email) {
+      const existing = await findByEmail(verified.email);
+      if (existing) throw new AppError('EMAIL_TAKEN');
+      user = await createUserWithEmail({
+        email: verified.email,
+        passwordHash,
+        fullName: full_name,
+        districtCode: district_code,
+        role,
+      });
+    }
+    // Register with phone
+    else if (verified.phone_number) {
+      const existing = await findByPhone(verified.phone_number);
+      if (existing) throw new AppError('PHONE_TAKEN');
+      user = await createUserWithProfile({
+        phone: verified.phone_number,
+        passwordHash,
+        fullName: full_name,
+        districtCode: district_code,
+        role,
+      });
+    } else {
+      throw new AppError('INVALID_TEMP_TOKEN');
+    }
 
     res.status(201).json({
       access_token: signAccessToken(user),
