@@ -29,19 +29,15 @@ async function findById(id) {
 /** Tao app_user + user_profile trong 1 giao dich - dung phone */
 async function createUserWithProfile({ phone, passwordHash, fullName, districtCode, role = 'PLAYER' }) {
   return withTransaction(async (c) => {
-    console.log('[createUserWithProfile] Inserting app_user...');
     const u = await c.query(
       `INSERT INTO app_user (phone, password_hash, role) VALUES ($1, $2, $3) RETURNING *`,
       [phone, passwordHash, role]);
     const user = u.rows[0];
-    console.log('[createUserWithProfile] app_user inserted:', { id: user.id });
 
-    console.log('[createUserWithProfile] Inserting user_profile...');
     const p = await c.query(
       `INSERT INTO user_profile (user_id, full_name, district_code)
        VALUES ($1, $2, $3) RETURNING full_name, district_code, skill_level`,
       [user.id, fullName, districtCode || null]);
-    console.log('[createUserWithProfile] user_profile inserted');
 
     return { ...user, ...p.rows[0] };
   });
