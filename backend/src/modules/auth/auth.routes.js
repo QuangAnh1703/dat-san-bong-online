@@ -193,6 +193,7 @@ router.post('/register-with-phone', async (req, res, next) => {
     if (existing) throw new AppError('PHONE_TAKEN');
 
     const passwordHash = await bcrypt.hash(password, 10);
+    console.log('[register-with-phone] Creating user:', { phone: phone_number, fullName: full_name, role });
     const user = await createUserWithProfile({
       phone: phone_number,
       passwordHash,
@@ -200,13 +201,17 @@ router.post('/register-with-phone', async (req, res, next) => {
       districtCode: district_code,
       role,
     });
+    console.log('[register-with-phone] User created:', { id: user.id, phone: user.phone });
 
     res.status(201).json({
       access_token: signAccessToken(user),
       refresh_token: signRefreshToken(user),
       user: toSafeUser(user),
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[register-with-phone] Error:', err.message, err);
+    next(err);
+  }
 });
 
 // GET /api/auth/google - Redirect to Google OAuth (or mock login)
