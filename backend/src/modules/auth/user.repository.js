@@ -36,7 +36,7 @@ async function createUserWithProfile({ phone, passwordHash, fullName, districtCo
 
     const p = await c.query(
       `INSERT INTO user_profile (user_id, full_name, district_code)
-       VALUES ($1, $2, $3) RETURNING full_name, district_code, skill_level`,
+       VALUES ($1, $2, $3) RETURNING user_id, full_name, avatar_url, district_code, skill_level, preferred_position, reputation_score, total_matches, bio, updated_at`,
       [user.id, fullName, districtCode || null]);
 
     return { ...user, ...p.rows[0] };
@@ -53,7 +53,7 @@ async function createUserWithEmail({ email, passwordHash, fullName, districtCode
 
     const p = await c.query(
       `INSERT INTO user_profile (user_id, full_name, district_code)
-       VALUES ($1, $2, $3) RETURNING full_name, district_code, skill_level`,
+       VALUES ($1, $2, $3) RETURNING user_id, full_name, avatar_url, district_code, skill_level, preferred_position, reputation_score, total_matches, bio, updated_at`,
       [user.id, fullName, districtCode || null]);
 
     return { ...user, ...p.rows[0] };

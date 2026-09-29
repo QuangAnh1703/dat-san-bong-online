@@ -17,7 +17,15 @@ export function AuthProvider({ children }) {
 
       if (stored && storedUser) {
         setToken(stored);
-        setUser(JSON.parse(storedUser));
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (err) {
+          console.warn('[AuthContext] Failed to parse stored user:', err.message);
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          setLoading(false);
+          return;
+        }
 
         // Sync user data from server to ensure consistency
         try {
