@@ -39,6 +39,10 @@ async function createUserWithProfile({ phone, passwordHash, fullName, districtCo
        VALUES ($1, $2, $3) RETURNING user_id, full_name, avatar_url, district_code, skill_level, preferred_position, reputation_score, total_matches, bio, updated_at`,
       [user.id, fullName, districtCode || null]);
 
+    if (p.rowCount === 0) {
+      throw new Error(`Failed to create user_profile for user ${user.id}`);
+    }
+
     return { ...user, ...p.rows[0] };
   });
 }
