@@ -23,3 +23,9 @@ Thumbs.db
 # Log & tam
 *.log
 tmp/
+
+# Cau hinh ca nhan cua Claude Code tren tung may
+.claude/settings.local.json
+
+# File nen tai ve (template, ban sao luu)
+*.zip

@@ -5,55 +5,62 @@
 **Hệ thống đặt sân bóng đá trực tuyến** - cho phép xem lịch, đặt cọc, ghép đôi giao hữu, ghép chân lẻ.
 Kiến trúc 3 lớp độc lập: Frontend (React), Backend (Express), Database (PostgreSQL).
 
-**Trạng thái:** 
-- Phase 0 (MVP): WF-01 hoàn thành, WF-02 → WF-10 chưa làm
+**Ngôn ngữ:** Toàn bộ dự án viết bằng **JavaScript** (frontend `.jsx`/`.js`, backend CommonJS `.js`). Không dùng TypeScript.
+
+**Trạng thái:**
+- Phase 0 (MVP): đã có phần lớn màn hình người chơi, chủ sân, admin (xem bảng Wireframes bên dưới)
 - Hiện tại: Đang làm feature auth phone register/login (feat/auth-phone-register-login)
 
 ## Tech Stack
 
 | Phần | Công nghệ |
 |---|---|
-| Frontend | React 18 + Vite + React Router v6 |
-| Backend | Node.js + Express + `pg` (no ORM) + JWT |
+| Frontend | React 19 + Vite 8 + React Router v7 + Tailwind CSS 4 + lucide-react |
+| Backend | Node.js ≥ 20 + Express 4 + `pg` (no ORM) + JWT + Redis + Passport (Google OAuth) + Nodemailer |
 | Database | PostgreSQL 16 (Docker) + Migration system |
 | Docs | OpenAPI 3.0 (Swagger UI) |
 
 **Ports:**
-- Frontend: `http://localhost:5173`
+- Frontend: `http://localhost:5173` (Vite proxy `/api`, `/health` → backend)
 - Backend: `http://localhost:3000`
 - Database: `localhost:5433` (Adminer: `http://localhost:8081`)
 
 ## Cấu trúc dự án
 
 ```
-├── frontend/                    React app (Vite)
+├── frontend/                    React app (Vite, JavaScript)
 │   ├── src/
-│   │   ├── components/         Header, Footer, AppLayout, UI components
-│   │   ├── features/           Screens tương ứng wireframes (WF-xx)
-│   │   ├── pages/              ComingSoonPage, NotFoundPage
-│   │   ├── services/           api.js, venues.js, ...
-│   │   ├── lib/                format.js, demoData.js
-│   │   ├── styles/global.css   Color palette + component shared
-│   │   └── router.jsx          Route definitions
+│   │   ├── main.jsx            Entry: BrowserRouter + App
+│   │   ├── App.jsx             Khung chung (Navbar, toast, Footer, AuthModal) + bảng route
+│   │   ├── pages/              Mỗi route một trang (HomePage, VenueDetailPage, ...)
+│   │   ├── components/         Navbar, Footer, AuthModal, PaymentPanel, PitchCard, các section trang chủ
+│   │   │   └── ui/             PageLayout (+ Card), Modal - khung dùng chung
+│   │   ├── context/AppContext.jsx  State toàn cục: auth, role, dữ liệu sân/đơn, gọi API
+│   │   ├── services/           api.js (apiClient, tokenStore), mappers.js (map dữ liệu API → UI)
+│   │   ├── assets/images/      Ảnh tĩnh
+│   │   └── index.css           Tailwind + style nền
 │   └── package.json
 │
-├── backend/                     REST API (Express)
+├── backend/                     REST API (Express, CommonJS)
 │   ├── src/
 │   │   ├── server.js           App init, CORS, port listener
 │   │   ├── db.js               PostgreSQL pool
-│   │   ├── middlewares/        Logging, 404, error handler
-│   │   └── routes/
-│   │       ├── index.js        /health, /api/districts + attach sub-routers
-│   │       ├── venues.js       /api/venues
-│   │       ├── fields.js       /api/fields
-│   │       └── bookings.js     /api/bookings
+│   │   ├── redis.js            Redis client
+│   │   ├── db/migrate.js       Chạy/kiểm tra migration
+│   │   ├── lib/errors.js       Danh sách error code
+│   │   ├── middlewares/        index.js (log, 404, error handler), auth.js, rbac.js
+│   │   ├── services/
+│   │   ├── modules/            admin, auth, bookings, community, complaints, owner,
+│   │   │                       payments, pricing, profile, teams, venues (*.routes.js, *.repository.js)
+│   │   └── routes/index.js     /health + gắn router của các module
 │   ├── .env.example
 │   └── package.json
 │
 ├── csdl/                        Database
-│   ├── docker-compose.yml       PostgreSQL 16
-│   ├── migrations/              V01..V10 (SQL)
-│   └── seed/                    Sample data
+│   ├── docker-compose.yml       PostgreSQL 16 + Redis 7 + Adminer
+│   └── db/
+│       ├── migration/           V01..V15 (SQL)
+│       └── all_in_one.sql
 │
 ├── docs/
 │   └── openapi.yaml            API specification (OpenAPI 3.0)
@@ -66,12 +73,14 @@ Kiến trúc 3 lớp độc lập: Frontend (React), Backend (Express), Database
 ```bash
 # 1) Database
 cd csdl
-docker compose up -d              # PostgreSQL + Adminer http://localhost:8081
+docker compose up -d              # PostgreSQL + Redis + Adminer http://localhost:8081
 
 # 2) Backend
 cd backend
-cp .env.example .env              # Config DATABASE_URL
+cp .env.example .env              # Config DATABASE_URL, JWT, Google OAuth...
 npm install
+npm run migrate                    # lần đầu / khi có migration mới
+npm run create-admin -- <email> <mật_khẩu>   # tạo / đặt lại tài khoản admin (chỉ chạy tay, không đưa vào migration)
 npm run dev                        # http://localhost:3000
 
 # 3) Frontend
@@ -80,7 +89,7 @@ npm install
 npm run dev                        # http://localhost:5173
 ```
 
-**Frontend fallback:** Nếu backend không chạy, giao diện dùng demo data từ `frontend/src/lib/demoData.js` + hiển thị banner cảnh báo.
+**Frontend cần backend chạy:** Không còn demo data. Nếu backend tắt, trang chủ hiển thị trạng thái lỗi "Không tải được danh sách sân" kèm nút Thử lại.
 
 ## Quy ước lập trình
 
@@ -106,12 +115,18 @@ Ví dụ:
 
 Phạm vi thường dùng: `frontend`, `backend`, `csdl`, `docs`.
 
-### Thêm màn hình mới
+### Thêm màn hình mới (frontend)
 
-1. Tạo thư mục trong `frontend/src/features/<tên-feature>/`
-2. Khai báo route trong `frontend/src/router.jsx`
-3. Gọi dữ liệu qua `frontend/src/services/`
-4. **Không sửa:** `frontend/src/App.jsx`, `global.css` (chỉ extend, không thay đổi design chung)
+1. Tạo file trong `frontend/src/pages/<TênPage>.jsx`
+2. Bọc nội dung bằng `PageLayout` (`components/ui/PageLayout.jsx`) để giữ cùng độ rộng, header, nút "Về trang chủ"; khối nội dung dùng `Card`
+3. Khai báo route trong `frontend/src/App.jsx` (trang cần đăng nhập thì bọc `RequireAuth`)
+4. Gọi dữ liệu qua `AppContext` / `frontend/src/services/`
+5. Điều hướng bằng `useNavigate` / `Link` của React Router, không dùng cờ `isXxxOpen` trong context
+
+### Trang hay Modal?
+
+- **Chức năng chính** (xem, đặt, quản lý) → **trang riêng** có route, dùng `PageLayout`
+- **Thao tác ngắn** (đăng nhập, xác nhận, form vài trường) → `Modal` (`components/ui/Modal.jsx`), kích thước `sm` / `md` / `lg`. Không tự viết overlay `fixed inset-0` riêng.
 
 ### API Error Response
 
@@ -140,70 +155,93 @@ Danh sách error code: `backend/src/lib/errors.js`
 
 **Quy ước:** Mỗi khi sửa API, cập nhật `docs/openapi.yaml` để giữ sync.
 
-## Wireframes & Progress (Phase 0)
+## Routes & Wireframes (Phase 0)
 
-| Mã | Màn hình | Route | Tên file | Trạng thái |
+| Mã | Màn hình | Route | File | Trạng thái |
 |---|---|---|---|---|
-| WF-01 | Trang chủ | `/` | HomePage | ✅ Hoàn thành |
-| WF-02 | Kết quả tìm kiếm & bộ lọc | `/tim-san` | SearchPage | ⏳ Chưa làm |
-| WF-03 | Chi tiết sân & sơ đồ lịch realtime | `/san/:id` | VenueDetailPage | ⏳ Chưa làm |
-| WF-04 | Xác nhận & thanh toán tiền cọc | `/thanh-toan/:code` | PaymentPage | ⏳ Chưa làm |
-| WF-05 | Đặt sân định kỳ | `/dat-dinh-ky` | SubscriptionPage | ⏳ Chưa làm |
-| WF-06 | Quản lý lịch đã đặt & đánh giá | `/lich-cua-toi` | MyBookingsPage | ⏳ Chưa làm |
-| WF-07 | Tìm đội giao hữu | `/giao-huu` | FindTeamPage | ⏳ Chưa làm |
-| WF-08 | Ghép chân lẻ | `/ghep-chan-le` | MatchmakingPage | ⏳ Chưa làm |
-| WF-09 | Hộ sơ & điểm uy tín | `/ho-so` | ProfilePage | ⏳ Chưa làm |
-| WF-10 | Dashboard chủ sân | `/chu-san` | OwnerDashboard | ⏳ Chưa làm |
+| WF-01 | Trang chủ | `/` (role player) | `pages/HomePage.jsx` | ✅ Có |
+| WF-02 | Tìm kiếm & bộ lọc | Section `#search-pitches` trên trang chủ | `HomePage` + `SearchBar` | 🟡 Chưa có route `/tim-san` riêng |
+| WF-03 | Chi tiết sân & lịch trống | `/san/:id` | `pages/VenueDetailPage.jsx` | ✅ Có |
+| WF-04 | Thanh toán tiền cọc | Hiển thị ngay sau khi giữ chỗ | `components/PaymentPanel.jsx` | 🟡 Chưa có route `/thanh-toan/:code` |
+| WF-05 | Đặt sân định kỳ | `/dat-dinh-ky` | `pages/SubscriptionPage.jsx` | ✅ Có |
+| WF-06 | Lịch đã đặt & đánh giá | `/lich-cua-toi` (cần đăng nhập) | `pages/MyBookingsPage.jsx` | ✅ Tab Sắp đá / Đã đá / Đã hủy, đánh giá sau trận |
+| WF-07 | Cáp kèo & tìm đối giao hữu | `/giao-huu`, đăng tin `/giao-huu/dang-tin` | `pages/MatchmakingPage.jsx`, `pages/ChallengePostPage.jsx` | ✅ Có |
+| — | Kèo gấp giá hời (Flash Sale) | `/keo-gap` | `pages/FlashSalePage.jsx` | ✅ Có |
+| WF-08 | Ghép chân lẻ | `/ghep-chan-le?tab=doi-tim-nguoi\|nguoi-tim-doi\|cua-toi`, đăng tuyển `/ghep-chan-le/dang-tuyen`, tìm đội `/ghep-chan-le/dang-tin` | `pages/FreelancePage.jsx`, `pages/RecruitPostPage.jsx`, `pages/PlayerPostPage.jsx` (API `/api/freelance`) | ✅ Có |
+| WF-09 | Hồ sơ & điểm uy tín | `/ho-so` (cần đăng nhập) | `pages/ProfilePage.jsx` | ✅ Có |
+| WF-10 | Dashboard chủ sân | `/` khi role = owner | `pages/OwnerDashboard.jsx` | ✅ Có |
+| — | Admin: tổng quan / người dùng / duyệt chủ sân / cụm sân / khiếu nại / báo cáo | `/` khi role = admin, `/quan-tri/nguoi-dung`, `/quan-tri/chu-san`, `/quan-tri/cum-san`, `/quan-tri/khieu-nai`, `/quan-tri/bao-cao` | `pages/AdminDashboard.jsx`, `pages/Admin*Page.jsx` | ✅ Có |
+
+Route `/` hiển thị theo vai trò của tài khoản (`role` trong `AppContext` = `user.role`). Ba vai trò tách biệt hoàn toàn: không có menu chuyển góc nhìn, trang của vai trò khác bị chặn (`RequireOwner`, `RequireAdmin` trong `App.jsx`).
 
 ## Frontend Design System
 
-**Color Palette:** `frontend/src/styles/global.css`
-- Được áp dụng từ mobile-first (xem memory)
-- Responsive grid, không thay đổi cấu trúc layout
+**Styling:** Tailwind CSS 4 (class utility trực tiếp trong JSX), giao diện tối (nền `#0b130e`, card `slate-900`, viền `slate-800`).
+- Màu nhấn theo vai trò: **emerald** (người chơi), **amber** (chủ sân), **cyan** (admin) - truyền qua prop `tone` của `PageLayout`
+- Font: Plus Jakarta Sans (khai báo trong `index.css`)
 
-**Component Patterns:**
-- `VenueCard` - thẻ sân
-- `Banner` - thông báo
-- `EmptyState` - trạng thái trống
-- `SkeletonGrid` - loading placeholder
-- `PitchGraphic` - vẽ sân bóng
+**Mobile-first (bắt buộc):**
+- Viết class cho mobile trước, mở rộng bằng `sm:` / `lg:` (ví dụ `grid-cols-1 sm:grid-cols-2`)
+- Dưới `lg`: menu ngang ẩn, dùng **thanh tab đáy** trong `Navbar.jsx`; `App.jsx` chừa `pb-16` cho thanh này
+- Modal trên mobile hiển thị dạng bottom sheet
 
-**Layout chung:** `frontend/src/components/layout/AppLayout`
+**Component dùng chung:**
+- `PageLayout`, `Card` - khung trang + khối nội dung (`components/ui/PageLayout.jsx`)
+- `Modal` - hộp thoại (`components/ui/Modal.jsx`), có Esc / bấm nền để đóng
+- `PitchCard` - thẻ sân
+- `PaymentPanel` - hướng dẫn chuyển cọc VietQR
 
 ## Quy ước khác
 
 ### Database Migrations
 
-- Chạy tự động khi backend khởi động
-- File: `csdl/migrations/V0X__description.sql`
-- Không xóa migration cũ, chỉ thêm migration mới
+- Backend khi khởi động chỉ **kiểm tra** schema khớp migration; nếu lệch phải chạy `npm run migrate` (trong `backend/`) rồi khởi động lại. Kiểm tra tay: `npm run migrate:validate`. Code: `backend/src/db/migrate.js`
+- File: `csdl/db/migration/VXX__description.sql`
+- Không xóa/sửa migration cũ, chỉ thêm migration mới
 
 ### Environment Variables
 
-**Backend** (`.env` từ `.env.example`):
+**Backend** (`backend/.env` từ `.env.example`), các biến chính:
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5433/sandbox
+DATABASE_URL=postgresql://sanbong:sanbong123@localhost:5433/sanbong
 PORT=3000
-NODE_ENV=development
-JWT_SECRET=<secret-key>
+CORS_ORIGIN=http://localhost:5173
+JWT_ACCESS_SECRET=...  JWT_REFRESH_SECRET=...
+GOOGLE_OAUTH_CLIENT_ID=...  GOOGLE_OAUTH_CLIENT_SECRET=...
+FRONTEND_URL=http://localhost:5173
 ```
+
+**Frontend** (`frontend/.env`): `VITE_API_URL` để trống khi dev (dùng Vite proxy), điền URL backend khi deploy.
 
 ## Preference Claude
 
-1. **Linting & Format:** Nếu dự án có ESLint/Prettier setup, tuân thủ quy tắc
-2. **Commit Style:** Luôn tuân thủ format `<loại>(<phạm-vi>): <mô-tả>`
-3. **Error Handling:** Dùng cấu trúc lỗi chung từ `backend/src/middlewares/`
-4. **Component Organization:** Không tạo abstraction không cần thiết; 3 dòng giống nhau là OK
-5. **Comments:** Chỉ viết comment nếu lý do không rõ ràng (WHY, không phải WHAT)
-6. **Testing:** Khi có test suite, chạy trước khi commit
-7. **API Documentation:** Cập nhật `docs/openapi.yaml` ngay khi thay đổi endpoint
-8. **UI Testing:** Trước khi báo xong, test chính UI qua browser (không chỉ tests)
-9. **Mobile-First Design:** Luôn thiết kế từ mobile trước, sau đó scale up (từ memory)
+1. **Ngôn ngữ:** Chỉ viết JavaScript (`.js`/`.jsx`), không thêm TypeScript
+2. **Linting & Format:** Dự án chưa có ESLint/Prettier config; code hiện theo style Prettier (single quote, printWidth 120, trailing comma)
+3. **Commit Style:** Luôn tuân thủ format `<loại>(<phạm-vi>): <mô-tả>`
+4. **Error Handling:** Dùng cấu trúc lỗi chung từ `backend/src/middlewares/`
+5. **Component Organization:** Không tạo abstraction không cần thiết; 3 dòng giống nhau là OK
+6. **Comments:** Chỉ viết comment nếu lý do không rõ ràng (WHY, không phải WHAT)
+7. **Testing:** Khi có test suite, chạy trước khi commit
+8. **API Documentation:** Cập nhật `docs/openapi.yaml` ngay khi thay đổi endpoint
+9. **UI Testing:** Trước khi báo xong, test chính UI qua browser (không chỉ build)
+10. **Mobile-First Design:** Luôn thiết kế từ mobile trước, sau đó scale up
+11. **Giao diện đồng nhất:** Màn hình mới dùng `PageLayout`/`Modal` dùng chung, không tự đặt độ rộng riêng
+
+## Skills
+
+Skill của dự án nằm trong `.claude/skills/` (Claude Code tự nạp; agent khác đọc qua `AGENTS.md`).
+
+| Skill | Dùng khi |
+|---|---|
+| `api-design` | Thêm/sửa endpoint REST, status code, phân trang, lỗi API |
+| `database-migrations` | Thay đổi schema/seed, viết migration `VXX__*.sql` mới |
+| `frontend-design` | Dựng màn hình mới / làm lại giao diện (giữ design system ở trên) |
 
 ## Quick Links
 
 - **API Docs (interactive):** `http://localhost:3000/docs` (khi backend chạy)
 - **OpenAPI Spec:** `docs/openapi.yaml`
 - **Error Codes:** `backend/src/lib/errors.js`
-- **Color Palette:** `frontend/src/styles/global.css`
+- **Routes frontend:** `frontend/src/App.jsx`
+- **Layout dùng chung:** `frontend/src/components/ui/`
 - **Endpoints:** Xem `README.md` phần "Endpoint"
