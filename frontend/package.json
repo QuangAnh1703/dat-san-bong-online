@@ -1,21 +1,30 @@
 {
-  "name": "sanbong-frontend",
-  "version": "1.0.0",
+  "name": "react-example",
   "private": true,
+  "version": "0.0.0",
   "type": "module",
-  "description": "Giao dien web dat san bong da - React + Vite",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port=5173 --host=0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "react-router-dom": "^7.18.4",
+    "vite": "^8.3.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.8"
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.28.0",
+    "tailwindcss": "^4.3.3"
   }
 }
