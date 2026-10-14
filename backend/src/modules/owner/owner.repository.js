@@ -26,14 +26,14 @@ async function findPendingOwnerRequest(userId) {
 async function listPendingOwnerRequests(limit = 20, offset = 0) {
   const r = await query(
     `SELECT
-       or.id, or.user_id, or.status, or.requested_at,
+       orq.id, orq.user_id, orq.status, orq.requested_at,
        u.email, u.phone,
        p.full_name, p.district_code
-     FROM owner_request or
-     JOIN app_user u ON u.id = or.user_id
+     FROM owner_request orq
+     JOIN app_user u ON u.id = orq.user_id
      LEFT JOIN user_profile p ON p.user_id = u.id
-     WHERE or.status = 'PENDING'
-     ORDER BY or.requested_at ASC
+     WHERE orq.status = 'PENDING'
+     ORDER BY orq.requested_at ASC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
   );
@@ -42,9 +42,7 @@ async function listPendingOwnerRequests(limit = 20, offset = 0) {
 
 // Lấy tổng số yêu cầu pending
 async function countPendingOwnerRequests() {
-  const r = await query(
-    `SELECT COUNT(*) as count FROM owner_request WHERE status = 'PENDING'`
-  );
+  const r = await query(`SELECT COUNT(*) as count FROM owner_request WHERE status = 'PENDING'`);
   return r.rows[0]?.count || 0;
 }
 
@@ -52,10 +50,7 @@ async function countPendingOwnerRequests() {
 async function approveOwnerRequest(requestId, adminId) {
   return withTransaction(async (c) => {
     // Lấy thông tin yêu cầu
-    const req = await c.query(
-      `SELECT * FROM owner_request WHERE id = $1`,
-      [requestId]
-    );
+    const req = await c.query(`SELECT * FROM owner_request WHERE id = $1`, [requestId]);
 
     if (req.rowCount === 0) {
       throw new Error('REQUEST_NOT_FOUND');
@@ -65,10 +60,7 @@ async function approveOwnerRequest(requestId, adminId) {
     const userId = ownerReq.user_id;
 
     // Cập nhật role người dùng
-    await c.query(
-      `UPDATE app_user SET role = 'OWNER' WHERE id = $1`,
-      [userId]
-    );
+    await c.query(`UPDATE app_user SET role = 'OWNER' WHERE id = $1`, [userId]);
 
     // Cập nhật trạng thái yêu cầu
     const result = await c.query(
@@ -100,13 +92,13 @@ async function rejectOwnerRequest(requestId, adminId, reason) {
 async function getOwnerRequest(requestId) {
   const r = await query(
     `SELECT
-       or.*,
+       orq.*,
        u.email, u.phone,
        p.full_name
-     FROM owner_request or
-     JOIN app_user u ON u.id = or.user_id
+     FROM owner_request orq
+     JOIN app_user u ON u.id = orq.user_id
      LEFT JOIN user_profile p ON p.user_id = u.id
-     WHERE or.id = $1`,
+     WHERE orq.id = $1`,
     [requestId]
   );
   return r.rows[0] || null;

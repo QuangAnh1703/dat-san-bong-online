@@ -50,6 +50,7 @@ async function createUserWithProfile({ phone, passwordHash, fullName, districtCo
 /** Tao app_user + user_profile trong 1 giao dich - dung email */
 async function createUserWithEmail({ email, passwordHash, fullName, districtCode, role = 'PLAYER' }) {
   return withTransaction(async (c) => {
+    // consloge.log(`Creating user with email: ${email}, fullName: ${fullName}, districtCode: ${districtCode}, role: ${role}`);  
     const u = await c.query(
       `INSERT INTO app_user (email, password_hash, role) VALUES ($1, $2, $3) RETURNING *`,
       [email.toLowerCase(), passwordHash, role]);

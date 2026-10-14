@@ -36,6 +36,19 @@ const validateTimeRange = (startTime, endTime) => {
   return { start, end };
 };
 
+// Sua bang gia: chu san chi duoc sua san cua minh (admin sua moi san)
+router.use('/:venueId', async (req, res, next) => {
+  if (req.method === 'GET' || !req.user || req.user.role === 'ADMIN') return next();
+  try {
+    const v = await query(`SELECT owner_id FROM venue WHERE id = $1`, [Number(req.params.venueId)]);
+    if (v.rowCount === 0) return next(new AppError('VENUE_NOT_FOUND'));
+    if (v.rows[0].owner_id !== req.user.id) return next(new AppError('FORBIDDEN'));
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/pricing/:venueId - List all pricing rules for venue
 router.get('/:venueId', async (req, res, next) => {
   try {
@@ -54,13 +67,15 @@ router.get('/:venueId', async (req, res, next) => {
 
     res.json({
       count: rules.rowCount,
-      data: rules.rows.map(r => ({
+      data: rules.rows.map((r) => ({
         ...r,
         from_time: minutesToTime(r.from_minute),
         to_time: minutesToTime(r.to_minute),
       })),
     });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // GET /api/pricing/:venueId/:id - Get single pricing rule
@@ -86,7 +101,9 @@ router.get('/:venueId/:id', async (req, res, next) => {
       from_time: minutesToTime(r.from_minute),
       to_time: minutesToTime(r.to_minute),
     });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // POST /api/pricing/:venueId - Create pricing rule (OWNER/ADMIN)
@@ -103,10 +120,14 @@ router.post('/:venueId', requireAuthenticated, requireRole('OWNER', 'ADMIN'), as
 
     // Validate prices
     if (typeof base_price !== 'number' || base_price <= 0) {
-      throw new AppError('INVALID_FIELD', { details: { field: 'base_price', reason: 'Must be positive number' } });
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'base_price', reason: 'Must be positive number' },
+      });
     }
     if (multiplier !== undefined && (typeof multiplier !== 'number' || multiplier < 0.1 || multiplier > 5)) {
-      throw new AppError('INVALID_FIELD', { details: { field: 'multiplier', reason: 'Must be between 0.1 and 5' } });
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'multiplier', reason: 'Must be between 0.1 and 5' },
+      });
     }
 
     const result = await withTransaction(async (c) => {
@@ -130,11 +151,13 @@ router.post('/:venueId', requireAuthenticated, requireRole('OWNER', 'ADMIN'), as
     const dbErr = fromDbError(err);
     // Handle GIST constraint violation (overlapping time slots)
     if (err.code === '23P01') {
-      return next(new AppError('CONSTRAINT_VIOLATED', {
-        message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
-        details: { error: 'PRICE_SLOT_OVERLAP' },
-        cause: err,
-      }));
+      return next(
+        new AppError('CONSTRAINT_VIOLATED', {
+          message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
+          details: { error: 'PRICE_SLOT_OVERLAP' },
+          cause: err,
+        })
+      );
     }
     next(dbErr || err);
   }
@@ -147,43 +170,73 @@ router.put('/:venueId/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'),
     const { field_type, day_type, from_time, to_time, base_price, multiplier, label } = req.body;
 
     // At least one field must be provided
-    if (!field_type && !day_type && !from_time && !to_time && !base_price && multiplier === undefined && label === undefined) {
+    if (
+      !field_type &&
+      !day_type &&
+      !from_time &&
+      !to_time &&
+      !base_price &&
+      multiplier === undefined &&
+      label === undefined
+    ) {
       throw new AppError('VALIDATION_ERROR', { message: 'No fields to update' });
     }
 
     // Validate time range if provided
     let start, end;
     if (from_time || to_time) {
-      const fromT = from_time || (await query(
-        `SELECT lower(time_span) as from_minute FROM price_rule WHERE id = $1`,
-        [Number(id)]
-      )).rows[0]?.from_minute;
-      const toT = to_time || (await query(
-        `SELECT upper(time_span) as to_minute FROM price_rule WHERE id = $1`,
-        [Number(id)]
-      )).rows[0]?.to_minute;
+      const fromT =
+        from_time ||
+        (await query(`SELECT lower(time_span) as from_minute FROM price_rule WHERE id = $1`, [Number(id)]))
+          .rows[0]?.from_minute;
+      const toT =
+        to_time ||
+        (await query(`SELECT upper(time_span) as to_minute FROM price_rule WHERE id = $1`, [Number(id)]))
+          .rows[0]?.to_minute;
 
       ({ start, end } = validateTimeRange(minutesToTime(fromT), minutesToTime(toT)));
     }
 
     // Validate prices if provided
     if (base_price !== undefined && (typeof base_price !== 'number' || base_price <= 0)) {
-      throw new AppError('INVALID_FIELD', { details: { field: 'base_price', reason: 'Must be positive number' } });
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'base_price', reason: 'Must be positive number' },
+      });
     }
     if (multiplier !== undefined && (typeof multiplier !== 'number' || multiplier < 0.1 || multiplier > 5)) {
-      throw new AppError('INVALID_FIELD', { details: { field: 'multiplier', reason: 'Must be between 0.1 and 5' } });
+      throw new AppError('INVALID_FIELD', {
+        details: { field: 'multiplier', reason: 'Must be between 0.1 and 5' },
+      });
     }
 
     const updates = [];
     const values = [];
     let paramIndex = 1;
 
-    if (field_type) { updates.push(`field_type = $${paramIndex++}`); values.push(field_type); }
-    if (day_type) { updates.push(`day_type = $${paramIndex++}`); values.push(day_type); }
-    if (from_time || to_time) { updates.push(`time_span = int4range($${paramIndex++}, $${paramIndex++})`); values.push(start, end); }
-    if (base_price !== undefined) { updates.push(`base_price = $${paramIndex++}`); values.push(base_price); }
-    if (multiplier !== undefined) { updates.push(`multiplier = $${paramIndex++}`); values.push(multiplier); }
-    if (label !== undefined) { updates.push(`label = $${paramIndex++}`); values.push(label); }
+    if (field_type) {
+      updates.push(`field_type = $${paramIndex++}`);
+      values.push(field_type);
+    }
+    if (day_type) {
+      updates.push(`day_type = $${paramIndex++}`);
+      values.push(day_type);
+    }
+    if (from_time || to_time) {
+      updates.push(`time_span = int4range($${paramIndex++}, $${paramIndex++})`);
+      values.push(start, end);
+    }
+    if (base_price !== undefined) {
+      updates.push(`base_price = $${paramIndex++}`);
+      values.push(base_price);
+    }
+    if (multiplier !== undefined) {
+      updates.push(`multiplier = $${paramIndex++}`);
+      values.push(multiplier);
+    }
+    if (label !== undefined) {
+      updates.push(`label = $${paramIndex++}`);
+      values.push(label);
+    }
 
     values.push(Number(id), Number(venueId));
 
@@ -209,11 +262,13 @@ router.put('/:venueId/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'),
   } catch (err) {
     // Handle GIST constraint violation
     if (err.code === '23P01') {
-      return next(new AppError('CONSTRAINT_VIOLATED', {
-        message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
-        details: { error: 'PRICE_SLOT_OVERLAP' },
-        cause: err,
-      }));
+      return next(
+        new AppError('CONSTRAINT_VIOLATED', {
+          message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
+          details: { error: 'PRICE_SLOT_OVERLAP' },
+          cause: err,
+        })
+      );
     }
     const dbErr = fromDbError(err);
     next(dbErr || err);
@@ -221,21 +276,28 @@ router.put('/:venueId/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'),
 });
 
 // DELETE /api/pricing/:venueId/:id - Delete pricing rule (OWNER/ADMIN)
-router.delete('/:venueId/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
-  try {
-    const { venueId, id } = req.params;
+router.delete(
+  '/:venueId/:id',
+  requireAuthenticated,
+  requireRole('OWNER', 'ADMIN'),
+  async (req, res, next) => {
+    try {
+      const { venueId, id } = req.params;
 
-    const result = await withTransaction(async (c) => {
-      const deleted = await c.query(
-        `DELETE FROM price_rule WHERE id = $1 AND venue_id = $2 RETURNING id`,
-        [Number(id), Number(venueId)]
-      );
-      if (deleted.rowCount === 0) throw new AppError('NOT_FOUND', { details: { id } });
-      return deleted.rows[0];
-    });
+      const result = await withTransaction(async (c) => {
+        const deleted = await c.query(`DELETE FROM price_rule WHERE id = $1 AND venue_id = $2 RETURNING id`, [
+          Number(id),
+          Number(venueId),
+        ]);
+        if (deleted.rowCount === 0) throw new AppError('NOT_FOUND', { details: { id } });
+        return deleted.rows[0];
+      });
 
-    res.json({ success: true, id: result.id });
-  } catch (e) { next(e); }
-});
+      res.json({ success: true, id: result.id });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 module.exports = router;

@@ -13,7 +13,8 @@ router.get('/health', async (_req, res, next) => {
       `SELECT current_database() AS db, current_user AS "user",
               (SELECT count(*) FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_type = 'BASE TABLE') AS tables,
-              now() AS server_time`);
+              now() AS server_time`
+    );
     res.json({ status: 'ok', ...r.rows[0] });
   } catch (err) {
     next(new AppError('DB_UNAVAILABLE', { cause: err }));
@@ -47,7 +48,9 @@ router.get('/api/districts', async (_req, res, next) => {
   try {
     const r = await query(`SELECT code, name FROM district ORDER BY name`);
     res.json({ count: r.rowCount, data: r.rows });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // --- Tai lieu API ---
@@ -87,5 +90,9 @@ router.use('/api/pricing', require('../modules/pricing/pricing.routes'));
 router.use('/api/bookings', require('../modules/bookings/bookings.routes'));
 router.use('/api/payments', require('../modules/payments/payments.routes'));
 router.use('/api/community', require('../modules/community/community.routes'));
+router.use('/api/freelance', require('../modules/community/freelance.routes'));
+router.use('/api/notifications', require('../modules/notifications/notifications.routes'));
+router.use('/api/teams', require('../modules/teams/teams.routes'));
+router.use('/api/complaints', require('../modules/complaints/complaints.routes'));
 
 module.exports = router;

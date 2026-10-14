@@ -12,12 +12,15 @@ const { requestId, requestLogger, notFound, errorHandler } = require('./middlewa
 const { verifyAccessToken, requireAuthenticated } = require('./middlewares/auth');
 const { checkPermission } = require('./middlewares/rbac');
 const routes = require('./routes');
+const { expireFreelance } = require('./modules/community/freelance.repository');
 
 const app = express();
 
 // Frontend chay o cong khac (Vite: 5173) -> phai bat CORS
 const ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
-  .split(',').map(s => s.trim()).filter(Boolean);
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 app.use(cors({ origin: ORIGINS, credentials: true }));
 app.use(express.json());
@@ -61,8 +64,29 @@ const PORT = Number(process.env.PORT || 3000);
   });
   const shutdown = () => {
     console.log('Dang dong...');
-    server.close(async () => { await pool.end(); process.exit(0); });
+    server.close(async () => {
+      await pool.end();
+      process.exit(0);
+    });
   };
+  // Nha cac don HELD qua han giu cho (khong co job nay slot bi chiem vinh vien)
+  const releaseTimer = setInterval(async () => {
+    try {
+      const r = await pool.query('SELECT fn_release_expired_holds() AS released');
+      await pool.query(
+        `UPDATE match_post mp SET status = 'CLOSED', closed_at = now()
+           FROM booking b
+          WHERE b.id = mp.booking_id AND mp.status = 'OPEN'
+            AND b.status::text LIKE 'CANCELLED%'`
+      );
+      await expireFreelance(pool);
+      if (r.rows[0].released > 0) console.log('[hold] nha %d slot qua han', r.rows[0].released);
+    } catch (err) {
+      console.error('[hold] loi khi nha slot qua han: %s', err.message);
+    }
+  }, 60 * 1000);
+  releaseTimer.unref();
+
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 })();

@@ -3,11 +3,7 @@ const express = require('express');
 const { AppError } = require('../../lib/errors');
 const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
-const {
-  createOwnerRequest,
-  findPendingOwnerRequest,
-  getOwnerRequest,
-} = require('./owner.repository');
+const { createOwnerRequest, findPendingOwnerRequest, getOwnerRequest } = require('./owner.repository');
 
 const router = express.Router();
 
@@ -18,17 +14,21 @@ router.post('/request', requireAuthenticated, async (req, res, next) => {
 
     // Chỉ PLAYER mới có thể yêu cầu
     if (req.user.role !== 'PLAYER') {
-      return next(new AppError('INVALID_OPERATION', {
-        message: 'Only PLAYER can request to become OWNER'
-      }));
+      return next(
+        new AppError('INVALID_OPERATION', {
+          message: 'Only PLAYER can request to become OWNER',
+        })
+      );
     }
 
     // Kiểm tra đã có yêu cầu pending chưa
     const existing = await findPendingOwnerRequest(userId);
     if (existing) {
-      return next(new AppError('OWNER_REQUEST_ALREADY_PENDING', {
-        details: { request_id: existing.id, created_at: existing.created_at }
-      }));
+      return next(
+        new AppError('OWNER_REQUEST_ALREADY_PENDING', {
+          details: { request_id: existing.id, created_at: existing.created_at },
+        })
+      );
     }
 
     const request = await createOwnerRequest(userId);
@@ -40,7 +40,7 @@ router.post('/request', requireAuthenticated, async (req, res, next) => {
         user_id: request.user_id,
         status: request.status,
         requested_at: request.requested_at,
-      }
+      },
     });
   } catch (err) {
     next(err);
@@ -63,11 +63,14 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
         status: request.status,
         requested_at: request.requested_at,
         reviewed_at: request.reviewed_at,
-      }
+      },
     });
   } catch (err) {
     next(err);
   }
 });
+
+// Dat sau /request va /me: router nay yeu cau vai tro OWNER/ADMIN cho moi request di qua
+router.use(require('./owner-manage.routes'));
 
 module.exports = router;

@@ -25,9 +25,20 @@ async function createPost({
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
     RETURNING *`,
     [
-      type, author_user_id, team_id, booking_id, district_code, play_date,
-      time_span, required_level, deal_note, slots_needed, cost_kind,
-      cost_amount, content, expires_at,
+      type,
+      author_user_id,
+      team_id,
+      booking_id,
+      district_code,
+      play_date,
+      time_span,
+      required_level,
+      deal_note,
+      slots_needed,
+      cost_kind,
+      cost_amount,
+      content,
+      expires_at,
     ]
   );
   return result.rows[0];
@@ -40,44 +51,64 @@ async function listPosts({
   play_date_from,
   play_date_to,
   required_level,
+  viewer_id,
   limit = 20,
   offset = 0,
 }) {
-  let sql = `SELECT * FROM match_post WHERE 1=1`;
-  const params = [];
-  let paramIdx = 1;
+  // Kem ten doi/nguoi dang/san va trang thai loi moi cua nguoi xem de UI khong phai goi them
+  const params = [viewer_id || null];
+  let sql = `SELECT mp.*,
+                    t.name AS team_name, t.member_count AS team_member_count,
+                    COALESCE(up.full_name, 'Thanh vien #' || mp.author_user_id) AS author_name,
+                    d.name AS district_name,
+                    v.id AS venue_id, v.name AS venue_name, f.name AS field_name, f.type AS field_type,
+                    (SELECT count(*) FROM join_request jr WHERE jr.post_id = mp.id AND jr.status = 'PENDING') AS pending_requests,
+                    (SELECT jr.status FROM join_request jr
+                      WHERE jr.post_id = mp.id AND jr.requester_user_id = $1) AS my_request_status
+               FROM match_post mp
+               LEFT JOIN team t ON t.id = mp.team_id
+               LEFT JOIN user_profile up ON up.user_id = mp.author_user_id
+               LEFT JOIN district d ON d.code = mp.district_code
+               LEFT JOIN booking b ON b.id = mp.booking_id
+               LEFT JOIN venue v ON v.id = b.venue_id
+               LEFT JOIN LATERAL (
+                 SELECT fi.name, fi.type FROM booking_slot bs JOIN field fi ON fi.id = bs.field_id
+                  WHERE bs.booking_id = b.id ORDER BY lower(bs.time_range) LIMIT 1
+               ) f ON TRUE
+              WHERE 1=1`;
+  let paramIdx = 2;
 
   if (type) {
-    sql += ` AND type = $${paramIdx++}`;
+    sql += ` AND mp.type = $${paramIdx++}`;
     params.push(type);
   }
 
   if (status) {
-    sql += ` AND status = $${paramIdx++}`;
+    sql += ` AND mp.status = $${paramIdx++}`;
     params.push(status);
   }
 
   if (district_code) {
-    sql += ` AND district_code = $${paramIdx++}`;
+    sql += ` AND mp.district_code = $${paramIdx++}`;
     params.push(district_code);
   }
 
   if (play_date_from) {
-    sql += ` AND play_date >= $${paramIdx++}`;
+    sql += ` AND mp.play_date >= $${paramIdx++}`;
     params.push(play_date_from);
   }
 
   if (play_date_to) {
-    sql += ` AND play_date <= $${paramIdx++}`;
+    sql += ` AND mp.play_date <= $${paramIdx++}`;
     params.push(play_date_to);
   }
 
   if (required_level) {
-    sql += ` AND required_level = $${paramIdx++}`;
+    sql += ` AND mp.required_level = $${paramIdx++}`;
     params.push(required_level);
   }
 
-  sql += ` ORDER BY created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  sql += ` ORDER BY mp.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
   params.push(limit, offset);
 
   const result = await query(sql, params);
@@ -124,12 +155,7 @@ async function updatePost(id, updates) {
   return result.rows[0];
 }
 
-async function createJoinRequest({
-  post_id,
-  requester_user_id,
-  requester_team_id,
-  message,
-}) {
+async function createJoinRequest({ post_id, requester_user_id, requester_team_id, message }) {
   const result = await query(
     `INSERT INTO join_request (post_id, requester_user_id, requester_team_id, message, created_at)
      VALUES ($1, $2, $3, $4, now())
@@ -140,26 +166,32 @@ async function createJoinRequest({
 }
 
 async function listJoinRequests({ post_id, requester_user_id, status, limit = 20, offset = 0 }) {
-  let sql = `SELECT * FROM join_request WHERE 1=1`;
+  let sql = `SELECT jr.*, up.full_name AS requester_name, u.phone AS requester_phone,
+                    t.name AS requester_team_name
+               FROM join_request jr
+               JOIN app_user u ON u.id = jr.requester_user_id
+               LEFT JOIN user_profile up ON up.user_id = jr.requester_user_id
+               LEFT JOIN team t ON t.id = jr.requester_team_id
+              WHERE 1=1`;
   const params = [];
   let paramIdx = 1;
 
   if (post_id) {
-    sql += ` AND post_id = $${paramIdx++}`;
+    sql += ` AND jr.post_id = $${paramIdx++}`;
     params.push(post_id);
   }
 
   if (requester_user_id) {
-    sql += ` AND requester_user_id = $${paramIdx++}`;
+    sql += ` AND jr.requester_user_id = $${paramIdx++}`;
     params.push(requester_user_id);
   }
 
   if (status) {
-    sql += ` AND status = $${paramIdx++}`;
+    sql += ` AND jr.status = $${paramIdx++}`;
     params.push(status);
   }
 
-  sql += ` ORDER BY created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+  sql += ` ORDER BY jr.created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
   params.push(limit, offset);
 
   const result = await query(sql, params);

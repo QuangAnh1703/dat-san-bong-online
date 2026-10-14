@@ -3,7 +3,15 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const passport = require('passport');
 const { AppError, requireFields } = require('../../lib/errors');
-const { findByPhone, findByEmail, createUserWithEmail, createUserWithProfile, touchLastLogin } = require('./user.repository');
+const jwt = require('jsonwebtoken');
+const {
+  findByPhone,
+  findByEmail,
+  findById,
+  createUserWithEmail,
+  createUserWithProfile,
+  touchLastLogin,
+} = require('./user.repository');
 const { signAccessToken, signRefreshToken } = require('./token');
 const { storeOtp, verifyOtp } = require('./otp.service');
 const { initGoogleOAuth } = require('./google-oauth.service');
@@ -31,7 +39,7 @@ router.post('/login', async (req, res, next) => {
 
     if (!email && !phone_number) {
       throw new AppError('INVALID_FIELD', {
-        details: { field: 'email/phone_number', reason: 'Email hoặc số điện thoại là bắt buộc' }
+        details: { field: 'email/phone_number', reason: 'Email hoặc số điện thoại là bắt buộc' },
       });
     }
 
@@ -49,8 +57,9 @@ router.post('/login', async (req, res, next) => {
       user = await findByPhone(phone_number);
     }
 
-    const ok = user && await bcrypt.compare(password, user.password_hash);
+    const ok = user && (await bcrypt.compare(password, user.password_hash));
     if (!ok) throw new AppError('INVALID_CREDENTIALS');
+    if (user.status === 'LOCKED') throw new AppError('ACCOUNT_LOCKED');
 
     await touchLastLogin(user.id);
 
@@ -59,7 +68,35 @@ router.post('/login', async (req, res, next) => {
       refresh_token: signRefreshToken(user),
       user: toSafeUser(user),
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/refresh  body: { refresh_token }
+// Access token chi song 15 phut -> client doi refresh token (7 ngay) lay access token moi
+router.post('/refresh', async (req, res, next) => {
+  try {
+    requireFields(req.body, ['refresh_token']);
+    let payload;
+    try {
+      payload = jwt.verify(req.body.refresh_token, process.env.JWT_REFRESH_SECRET);
+    } catch (e) {
+      throw new AppError(e.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN');
+    }
+    if (payload.type !== 'refresh') throw new AppError('INVALID_TOKEN');
+
+    const user = await findById(payload.sub);
+    if (!user) throw new AppError('INVALID_TOKEN');
+    if (user.status === 'LOCKED') throw new AppError('ACCOUNT_LOCKED');
+
+    res.json({
+      access_token: signAccessToken(user),
+      refresh_token: signRefreshToken(user),
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/auth/request-otp  body: { email }
@@ -129,7 +166,7 @@ router.post('/register-with-otp', async (req, res, next) => {
     const validRoles = ['PLAYER', 'OWNER'];
     if (!validRoles.includes(role)) {
       throw new AppError('INVALID_FIELD', {
-        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` }
+        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` },
       });
     }
 
@@ -165,7 +202,9 @@ router.post('/register-with-otp', async (req, res, next) => {
       refresh_token: signRefreshToken(user),
       user: toSafeUser(user),
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/auth/register-with-phone  body: { phone_number, password, full_name, district_code?, role? }
@@ -185,7 +224,7 @@ router.post('/register-with-phone', async (req, res, next) => {
     const validRoles = ['PLAYER', 'OWNER'];
     if (!validRoles.includes(role)) {
       throw new AppError('INVALID_FIELD', {
-        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` }
+        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` },
       });
     }
 
@@ -567,7 +606,9 @@ router.post('/verify-reset-otp', async (req, res, next) => {
     await verifyOtp(email, otp, 'RESET_PASSWORD');
 
     // Return temp token (valid for 10 minutes)
-    const tempToken = Buffer.from(JSON.stringify({ email, verified_at: Date.now(), action: 'reset_password' })).toString('base64');
+    const tempToken = Buffer.from(
+      JSON.stringify({ email, verified_at: Date.now(), action: 'reset_password' })
+    ).toString('base64');
     res.json({ temp_token: tempToken });
   } catch (err) {
     if (err.message === 'OTP_EXPIRED') {
@@ -613,13 +654,15 @@ router.post('/reset-password', async (req, res, next) => {
     if (!user) throw new AppError('USER_NOT_FOUND');
 
     const passwordHash = await bcrypt.hash(password, 10);
-    await query(
-      `UPDATE app_user SET password_hash = $1, updated_at = now() WHERE id = $2`,
-      [passwordHash, user.id]
-    );
+    await query(`UPDATE app_user SET password_hash = $1, updated_at = now() WHERE id = $2`, [
+      passwordHash,
+      user.id,
+    ]);
 
     res.json({ message: 'Password reset successfully' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

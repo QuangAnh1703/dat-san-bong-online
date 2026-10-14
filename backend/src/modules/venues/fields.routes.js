@@ -15,9 +15,13 @@ router.get('/:id/schedule', async (req, res, next) => {
     const r = await query(
       `SELECT * FROM v_field_schedule
         WHERE field_id = $1 AND play_date = $2::date
-        ORDER BY start_at`, [id, date]);
+        ORDER BY start_at`,
+      [id, date]
+    );
     res.json({ field_id: id, play_date: date, count: r.rowCount, slots: r.rows });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // GET /api/fields/:id/availability?date=2026-09-10&start=18:00&end=19:30
@@ -29,9 +33,12 @@ router.get('/:id/availability', async (req, res, next) => {
     const r = await query(
       `SELECT fn_is_slot_available($1, tstzrange(($2 || ' ' || $3)::timestamptz,
                                                  ($2 || ' ' || $4)::timestamptz, '[)')) AS available`,
-      [id, date, start, end]);
+      [id, date, start, end]
+    );
     res.json({ field_id: id, date, start, end, available: r.rows[0].available });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // POST /api/fields - Create field (SCRUM-116, OWNER/ADMIN only)
@@ -43,13 +50,21 @@ router.post('/', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req
     // Validation
     const validTypes = ['F5', 'F7', 'F11'];
     if (!validTypes.includes(type)) {
-      return next(new AppError('INVALID_FIELD', {
-        details: { field: 'type', reason: `Must be one of: ${validTypes.join(', ')}` }
-      }));
+      return next(
+        new AppError('INVALID_FIELD', {
+          details: { field: 'type', reason: `Must be one of: ${validTypes.join(', ')}` },
+        })
+      );
     }
 
     if (typeof name !== 'string' || name.trim().length === 0 || name.length > 120) {
       return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 120 chars' } }));
+    }
+
+    if (req.user.role !== 'ADMIN') {
+      const v = await query(`SELECT owner_id FROM venue WHERE id = $1`, [venue_id]);
+      if (v.rowCount === 0) throw new AppError('VENUE_NOT_FOUND');
+      if (v.rows[0].owner_id !== req.user.id) throw new AppError('FORBIDDEN');
     }
 
     const result = await query(
@@ -60,7 +75,9 @@ router.post('/', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req
     );
 
     res.status(201).json({ message: 'Field created', field: result.rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // PUT /api/fields/:id - Update field (SCRUM-116)
@@ -73,9 +90,11 @@ router.put('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (r
     if (type !== undefined) {
       const validTypes = ['F5', 'F7', 'F11'];
       if (!validTypes.includes(type)) {
-        return next(new AppError('INVALID_FIELD', {
-          details: { field: 'type', reason: `Must be one of: ${validTypes.join(', ')}` }
-        }));
+        return next(
+          new AppError('INVALID_FIELD', {
+            details: { field: 'type', reason: `Must be one of: ${validTypes.join(', ')}` },
+          })
+        );
       }
     }
 
@@ -111,7 +130,9 @@ router.put('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (r
     }
 
     res.json({ message: 'Field updated', field: result.rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // DELETE /api/fields/:id - Delete field (SCRUM-116)
@@ -119,18 +140,25 @@ router.delete('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async
   try {
     const fieldId = Number(req.params.id);
 
+    if (req.user.role !== 'ADMIN') {
+      const own = await query(
+        `SELECT 1 FROM field f JOIN venue v ON v.id = f.venue_id WHERE f.id = $1 AND v.owner_id = $2`,
+        [fieldId, req.user.id]
+      );
+      if (own.rowCount === 0) throw new AppError('FORBIDDEN');
+    }
+
     // Delete field and related slots
-    const result = await query(
-      `DELETE FROM field WHERE id = $1 RETURNING id`,
-      [fieldId]
-    );
+    const result = await query(`DELETE FROM field WHERE id = $1 RETURNING id`, [fieldId]);
 
     if (result.rowCount === 0) {
       return next(new AppError('FIELD_NOT_FOUND'));
     }
 
     res.json({ message: 'Field deleted' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

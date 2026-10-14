@@ -40,9 +40,17 @@ tags:
   - name: Bang gia
   - name: Dat san
   - name: Cong dong - Ghep doi
+  - name: Ghep chan le
+  - name: Thong bao
   - name: Quan tri - Duyet san
   - name: Quan tri - Duyet Chu san
   - name: Quan tri - Quan ly Nguoi dung
+  - name: Quan tri - Khieu nai
+  - name: Quan tri - Bao cao
+  - name: Thanh toan
+  - name: Doi bong
+  - name: Khieu nai
+  - name: Chu san - Van hanh
 
 paths:
   /health:
@@ -339,6 +347,75 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/VenueSummary' }
 
+  /api/venues/flash-sales:
+    get:
+      tags: [Cum san]
+      summary: Cac cum san dang bat Flash Sale (Keo gap gia hoi)
+      description: >
+        Tra ve cum san APPROVED co khuyen mai FLASH_SALE dang hieu luc, kem san con, bang gia
+        va cac slot da kin (HELD/CONFIRMED/LOCKED) hom nay va ngay mai. Frontend tu dung luoi slot
+        90 phut va ap giam gia nhu trang chi tiet san.
+      responses:
+        '200':
+          description: Danh sach cum san co Flash Sale
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        address: { type: string }
+                        district_code: { type: string }
+                        district_name: { type: string }
+                        open_time: { type: string, example: '06:00:00' }
+                        close_time: { type: string, example: '23:59:00' }
+                        deposit_rate: { type: number }
+                        flash_sale:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            discount_percent: { type: integer }
+                            trigger_hours_before: { type: integer }
+                            floor_price: { type: number, nullable: true }
+                            applies_field_type: { type: string, enum: [F5, F7, F11], nullable: true }
+                            time_spans:
+                              type: array
+                              nullable: true
+                              items:
+                                type: object
+                                properties:
+                                  from_minute: { type: integer }
+                                  to_minute: { type: integer }
+                        fields:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
+                              type: { type: string, enum: [F5, F7, F11] }
+                              is_active: { type: boolean }
+                        price_rules:
+                          type: array
+                          items: { type: object }
+                        schedule:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              field_id: { type: integer }
+                              play_date: { type: string, format: date }
+                              start_at: { type: string, format: date-time }
+                              end_at: { type: string, format: date-time }
+                              slot_status: { type: string, enum: [HELD, CONFIRMED, LOCKED] }
+
   /api/venues/{id}:
     get:
       tags: [Cum san]
@@ -491,7 +568,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
-          description: Khung gio bi chong lap (SCRUM-122, code: `PRICE_SLOT_OVERLAP`)
+          description: 'Khung gio bi chong lap (SCRUM-122, code: `PRICE_SLOT_OVERLAP`)'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -584,6 +661,17 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /api/bookings:
+    get:
+      tags: [Dat san]
+      summary: Lich cua toi
+      description: |
+        Gom don minh dat va cac tran minh duoc chap nhan tham gia qua cap keo / ghep chan le
+        (`match_participant`). Voi tran tham gia, `is_participant = true` va `host_name` la nguoi dat san.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Toi da 100 don, moi don kem `slots`, `services`, `is_participant`, `host_name`
     post:
       tags: [Dat san]
       summary: Tao don dat san va giu khung gio
@@ -687,7 +775,59 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Don o trang thai khong cho huy (`INVALID_STATUS`)
+          description: Don o trang thai khong cho huy (`INVALID_STATUS`) hoac da qua gio bat dau tran (`BOOKING_ALREADY_STARTED`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/bookings/{code}/rate:
+    post:
+      tags: [Dat san]
+      summary: Danh gia tran da da xong (moi don 1 lan, chi nguoi dat)
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pitch_rating, service_rating]
+              properties:
+                pitch_rating:   { type: integer, minimum: 1, maximum: 5, example: 5 }
+                service_rating: { type: integer, minimum: 1, maximum: 5, example: 4 }
+                comment:        { type: string, maxLength: 1000, example: Co dep, den sang }
+      responses:
+        '201':
+          description: Da luu danh gia, diem trung binh cua cum san duoc cap nhat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:           { type: string }
+                  id:             { type: integer }
+                  pitch_rating:   { type: integer }
+                  service_rating: { type: integer }
+                  comment:        { type: string, nullable: true }
+                  created_at:     { type: string, format: date-time }
+        '400':
+          description: Diem khong hop le (`INVALID_RATING`) hoac tran chua da xong / don khong hop le (`CANNOT_RATE`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Khong phai nguoi dat don (`FORBIDDEN`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Da danh gia don nay roi (`ALREADY_RATED`)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -706,6 +846,338 @@ paths:
                 type: object
                 properties:
                   released: { type: integer, example: 3 }
+
+  /api/freelance/recruits:
+    get:
+      tags: [Ghep chan le]
+      summary: Tab "Doi bong tim nguoi" - bai tuyen chan le dang mo (bai bi bung keo sat gio xep dau)
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: district, in: query, schema: { type: string }, description: Ma quan/huyen }
+        - { name: period, in: query, schema: { type: string, enum: [morning, afternoon, evening] }, description: 'Sang (<12h) / Chieu (12-18h) / Toi (>=18h) theo gio bat dau' }
+        - { name: level, in: query, schema: { $ref: '#/components/schemas/SkillLevel' } }
+        - { name: cost, in: query, schema: { type: string, enum: [FREE, FIXED, VOLUNTARY] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200':
+          description: Danh sach co phan trang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: { type: integer }
+                  limit: { type: integer }
+                  total: { type: integer }
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/RecruitPost' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Ghep chan le]
+      summary: Doi truong dang bai tim chan le cho tran da dat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code, slots_needed, cost_kind]
+              properties:
+                booking_code: { type: string, example: BK261013ABCDE }
+                slots_needed: { type: integer, minimum: 1, maximum: 10, example: 2 }
+                positions:
+                  type: array
+                  items: { $ref: '#/components/schemas/Position' }
+                  example: [DF, GK]
+                required_level: { $ref: '#/components/schemas/SkillLevel' }
+                cost_kind: { type: string, enum: [FREE, FIXED, VOLUNTARY] }
+                cost_amount: { type: number, description: Bat buoc khi cost_kind = FIXED, example: 30000 }
+                content: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Da dang bai
+        '400':
+          description: Tuyen qua 10 nguoi (`RECRUIT_LIMIT_EXCEEDED`) hoac du lieu sai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Tran da co bai tuyen dang mo (`RECRUIT_POST_EXISTS`), don khong con hieu luc (`INVALID_STATUS`) hoac da qua gio (`BOOKING_ALREADY_STARTED`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/recruits/{id}/apply:
+    post:
+      tags: [Ghep chan le]
+      summary: Nguoi choi le xin tham gia; doi truong nhan thong bao
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message: { type: string, maxLength: 300, example: 'Minh da vi tri hau ve, toi nay tham gia duoc' }
+                confirm_level: { type: boolean, description: Gui lai voi true sau khi nguoi dung dong y canh bao lech trinh do }
+      responses:
+        '201':
+          description: Da gui yeu cau (PENDING)
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >-
+            `RECRUIT_FULL` (doi da tuyen du nguoi), `LEVEL_MISMATCH` (trinh do thap hon yeu cau, chua xac nhan;
+            details: my_level, required_level), `REQUEST_ALREADY_EXISTS`, `ALREADY_IN_MATCH`, `POST_NOT_OPEN`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/players:
+    get:
+      tags: [Ghep chan le]
+      summary: Tab "Nguoi choi tim doi" - tin tim doi dang mo
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: district, in: query, schema: { type: string }, description: Khop bat ky khu vuc nao nguoi choi chon }
+        - { name: period, in: query, schema: { type: string, enum: [morning, afternoon, evening] } }
+        - { name: level, in: query, schema: { $ref: '#/components/schemas/SkillLevel' } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200':
+          description: Danh sach co phan trang (page, limit, total, count, data)
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Ghep chan le]
+      summary: Nguoi choi le dang tin tim doi
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [play_date, start, end, district_codes]
+              properties:
+                play_date: { type: string, format: date }
+                start: { type: string, example: '19:00' }
+                end: { type: string, example: '20:30' }
+                district_codes: { type: array, maxItems: 5, items: { type: string }, example: [CG, NTL] }
+                positions: { type: array, items: { $ref: '#/components/schemas/Position' } }
+                level: { $ref: '#/components/schemas/SkillLevel' }
+                content: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Da dang tin
+        '400':
+          description: Khung gio sai hoac da qua (`INVALID_TIME_RANGE`), khu vuc sai (`INVALID_FIELD`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Da co tin tim doi de gio (`PLAYER_POST_OVERLAP`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/players/{id}/invite:
+    post:
+      tags: [Ghep chan le]
+      summary: Doi truong moi nguoi choi le vao tran; loi moi tu het han sau 30 phut
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code]
+              properties:
+                booking_code: { type: string }
+                message: { type: string, maxLength: 300 }
+      responses:
+        '201':
+          description: Da gui loi moi (kem expires_at)
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`REQUEST_ALREADY_EXISTS` (loi moi con hieu luc), `ALREADY_IN_MATCH`, `POST_NOT_OPEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/posts/{id}/requests:
+    get:
+      tags: [Ghep chan le]
+      summary: Chu bai xem yeu cau/loi moi kem ho so (diem uy tin, vi tri, trinh do); SDT chi hien khi da chap nhan
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Danh sach yeu cau
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/freelance/posts/{id}/close:
+    post:
+      tags: [Ghep chan le]
+      summary: Chu bai dong bai; yeu cau dang cho bi tu choi
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Da dong
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Bai khong con mo (`POST_NOT_OPEN`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/requests/{id}:
+    put:
+      tags: [Ghep chan le]
+      summary: Chu bai phan hoi - doi truong duyet nguoi xin (APPLY), nguoi choi nhan/tu choi loi moi (INVITE)
+      description: >-
+        Chap nhan: them nguoi choi vao match_participant, tru so cho can tuyen; du nguoi thi bai chuyen MATCHED
+        va cac yeu cau con cho bi tu choi. Ca hai phia deu nhan thong bao.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [ACCEPTED, REJECTED] }
+      responses:
+        '200':
+          description: Da phan hoi
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`RECRUIT_FULL`, `INVITE_EXPIRED` (qua 30 phut), `INVALID_STATUS`, `BOOKING_ALREADY_STARTED`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/matches/{code}/leave:
+    post:
+      tags: [Ghep chan le]
+      summary: Nguoi choi le huy tham gia tran
+      description: >-
+        Tra lai cho trong bai tuyen (mo lai neu da du). Huy truoc gio da duoi 1 tieng: tru 5 diem uy tin
+        (ghi reputation_log) va day bai tuyen len dau danh sach.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Da huy tham gia
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  penalty: { type: integer, example: 5 }
+                  reputation_score: { type: integer, nullable: true, example: 95 }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Tran da bat dau (`BOOKING_ALREADY_STARTED`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/freelance/me:
+    get:
+      tags: [Ghep chan le]
+      summary: Tab "Cua toi" - bai tuyen, tin tim doi, yeu cau da gui, loi moi (nhan + gui)
+      description: Yeu cau/loi moi da chap nhan kem dia chi san va SDT doi truong.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '{ recruits, player_posts, applications, invites }'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/notifications:
+    get:
+      tags: [Thong bao]
+      summary: Thong bao cua nguoi dung (moi nhat truoc)
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 50 } }
+      responses:
+        '200':
+          description: Danh sach
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page: { type: integer }
+                  limit: { type: integer }
+                  total: { type: integer }
+                  unread: { type: integer }
+                  count: { type: integer }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        type: { type: string, example: FREELANCE_APPLY }
+                        title: { type: string }
+                        body: { type: string, nullable: true }
+                        is_read: { type: boolean }
+                        booking_code: { type: string, nullable: true }
+                        created_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/notifications/read:
+    post:
+      tags: [Thong bao]
+      summary: Danh dau da doc (bo trong ids = tat ca)
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: '{ updated }'
 
   /api/community/posts:
     get:
@@ -1461,7 +1933,435 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/auth/refresh:
+    post:
+      tags: [Xac thuc]
+      summary: Doi refresh token lay access token moi
+      description: Access token song 15 phut, refresh token 7 ngay. Tai khoan bi khoa nhan `ACCOUNT_LOCKED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Cap token moi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  refresh_token: { type: string }
+        '401':
+          description: '`TOKEN_EXPIRED` / `INVALID_TOKEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: '`ACCOUNT_LOCKED`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/bookings/recurring:
+    post:
+      tags: [Dat san]
+      summary: Dat san dinh ky theo tuan (hop dong giu san)
+      description: |
+        Tao mot don `RECURRING` gom moi buoi trong `months` thang roi vao `weekdays`, o trang thai `HELD`.
+        Chiet khau lay tu khuyen mai `CONTRACT_DISCOUNT` cua san, mac dinh 10% (1-2 thang) / 15% (>= 3 thang).
+        Neu co buoi da bi dat, tra `RECURRING_CONFLICT` kem danh sach ngay trong `details.dates`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field_id, weekdays, start_date, months, start, end]
+              properties:
+                field_id:   { type: integer, example: 1 }
+                weekdays:   { type: array, items: { type: integer, minimum: 1, maximum: 7 }, example: [2, 5], description: 'ISO: 1 = Thu 2, 7 = Chu nhat' }
+                start_date: { type: string, format: date }
+                months:     { type: integer, minimum: 1, maximum: 6 }
+                start:      { type: string, example: '19:00' }
+                end:        { type: string, example: '20:30' }
+                note:       { type: string }
+      responses:
+        '201':
+          description: Tao hop dong thanh cong
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Booking'
+                  - type: object
+                    properties:
+                      sessions_total:    { type: integer }
+                      contract_discount: { type: integer, description: Phan tram chiet khau }
+        '409':
+          description: '`RECURRING_CONFLICT` / `NO_PRICE_RULE`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/payments:
+    post:
+      tags: [Thanh toan]
+      summary: Bao da chuyen khoan tien coc
+      description: |
+        Chi ho tro chuyen khoan ngan hang (cong VNPay/MoMo chua tich hop). Don `HELD` chuyen sang
+        `PENDING_VERIFY` (khong con bi tu huy) va cho chu san xac nhan. Tra ve thong tin chuyen khoan
+        de client hien ma VietQR.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code]
+              properties:
+                booking_code:   { type: string }
+                bill_image_url: { type: string, description: Anh bien lai (tuy chon) }
+      responses:
+        '201':
+          description: Da ghi nhan thanh toan cho duyet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking_code: { type: string }
+                  status: { type: string, example: PENDING_VERIFY }
+                  payment: { type: object }
+                  transfer:
+                    type: object
+                    properties:
+                      bank_name:    { type: string }
+                      bank_account: { type: string }
+                      bank_holder:  { type: string }
+                      amount:       { type: integer }
+                      content:      { type: string, example: SANBONG BK260930ABCDE }
+        '409':
+          description: '`INVALID_STATUS` - don khong o trang thai HELD'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/teams/me:
+    get:
+      tags: [Doi bong]
+      summary: Doi ma nguoi dung dang lam doi truong
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`team` = null neu chua co doi'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team: { $ref: '#/components/schemas/Team' }
+    put:
+      tags: [Doi bong]
+      summary: Tao hoac cap nhat doi bong cua minh
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:          { type: string, maxLength: 120 }
+                member_count:  { type: integer, minimum: 1, maximum: 50 }
+                skill_level:   { type: string, enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO] }
+                district_code: { type: string }
+      responses:
+        '200':
+          description: Doi sau khi luu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team: { $ref: '#/components/schemas/Team' }
+
+  /api/complaints:
+    post:
+      tags: [Khieu nai]
+      summary: Gui khieu nai ve mot don dat cua minh
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code, subject, content]
+              properties:
+                booking_code: { type: string }
+                subject:      { type: string, maxLength: 200 }
+                content:      { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          description: Da tao phieu khieu nai (status NEW)
+
+  /api/complaints/me:
+    get:
+      tags: [Khieu nai]
+      summary: Khieu nai cua toi
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sach phieu kem ket qua xu ly
+
+  /api/owner/venues:
+    get:
+      tags: [Chu san - Van hanh]
+      summary: Cum san cua chu san (moi trang thai; admin thay tat ca)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sach cum san
+
+  /api/owner/bookings:
+    get:
+      tags: [Chu san - Van hanh]
+      summary: Don dat cua mot cum san
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: venue_id, in: query, required: true, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, example: 'HELD,PENDING_VERIFY' }, description: Loc theo trang thai, cach nhau dau phay }
+      responses:
+        '200':
+          description: Don kem khach hang, khung gio, dich vu va lan thanh toan gan nhat
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/owner/bookings/{code}/confirm:
+    post:
+      tags: [Chu san - Van hanh]
+      summary: Xac nhan da nhan coc (HELD / PENDING_VERIFY -> CONFIRMED)
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Don da xac nhan, thanh toan cho duyet chuyen SUCCESS
+
+  /api/owner/bookings/{code}/reject:
+    post:
+      tags: [Chu san - Van hanh]
+      summary: Tu choi / huy don cua khach (CANCELLED_BY_OWNER)
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Da huy don va nha khung gio
+
+  /api/owner/locks:
+    post:
+      tags: [Chu san - Van hanh]
+      summary: Khoa slot (bao tri) hoac tao don cho khach goi dien / tai quay
+      description: |
+        Tao don `OWNER_LOCK` voi slot `LOCKED`. `WALK_IN` tinh tien theo bang gia va bat buoc `guest_name`;
+        `MAINTENANCE` / `OTHER` gia 0.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field_id, play_date, start, end, reason]
+              properties:
+                field_id:    { type: integer }
+                play_date:   { type: string, format: date }
+                start:       { type: string, example: '19:00' }
+                end:         { type: string, example: '20:30' }
+                reason:      { type: string, enum: [WALK_IN, MAINTENANCE, OTHER] }
+                guest_name:  { type: string }
+                guest_phone: { type: string }
+                note:        { type: string }
+      responses:
+        '201':
+          description: Da khoa slot
+        '409':
+          description: '`SLOT_TAKEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/owner/locks/{code}:
+    delete:
+      tags: [Chu san - Van hanh]
+      summary: Mo lai slot da khoa
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Da mo slot
+
+  /api/owner/venues/{id}/flash-sale:
+    get:
+      tags: [Chu san - Van hanh]
+      summary: Cau hinh Flash Sale hien tai
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      responses:
+        '200':
+          description: '`flash_sale` = null neu chua cau hinh'
+    put:
+      tags: [Chu san - Van hanh]
+      summary: Bat / tat / sua Flash Sale gio vang
+      description: Slot con trong va cach gio da <= `trigger_hours_before` gio duoc giam `discount_percent`%.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [discount_percent, trigger_hours_before]
+              properties:
+                is_active:            { type: boolean, default: true }
+                discount_percent:     { type: integer, minimum: 1, maximum: 90 }
+                trigger_hours_before: { type: integer, minimum: 1, maximum: 48 }
+      responses:
+        '200':
+          description: Cau hinh sau khi luu
+
+  /api/admin/users/{id}/status:
+    put:
+      tags: [Quan tri - Quan ly Nguoi dung]
+      summary: Khoa / mo khoa tai khoan
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [ACTIVE, LOCKED] }
+      responses:
+        '200':
+          description: Da cap nhat trang thai
+
+  /api/admin/complaints:
+    get:
+      tags: [Quan tri - Khieu nai]
+      summary: Danh sach khieu nai
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, example: 'NEW,IN_PROGRESS' } }
+      responses:
+        '200':
+          description: Phieu kem don, san, nguoi khieu nai va so tien coc da thanh toan (`paid_amount`)
+
+  /api/admin/complaints/{id}/resolve:
+    post:
+      tags: [Quan tri - Khieu nai]
+      summary: Xu ly khieu nai (hoan coc hoac tu choi)
+      description: '`REFUND` hoan 100% cac khoan coc SUCCESS, don chuyen REFUNDED va nha slot.'
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, resolution]
+              properties:
+                outcome:    { type: string, enum: [REFUND, REJECT] }
+                resolution: { type: string }
+      responses:
+        '200':
+          description: Phieu da RESOLVED, kem `refunded_amount`
+
+  /api/admin/reports:
+    get:
+      tags: [Quan tri - Bao cao]
+      summary: Bao cao thang nay va ty le lap day theo khung gio (30 ngay)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Bao cao
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  month:
+                    type: object
+                    properties:
+                      bookings:        { type: integer }
+                      cancelled:       { type: integer }
+                      gmv:             { type: number }
+                      matched_posts:   { type: integer }
+                      open_complaints: { type: integer }
+                  occupancy:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:            { type: string, example: '17:30 - 21:00' }
+                        used_minutes:     { type: integer }
+                        capacity_minutes: { type: integer }
+                        rate:             { type: number, description: Phan tram }
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   parameters:
     VenueId:
       name: id
@@ -1475,6 +2375,16 @@ components:
       schema: { type: integer }
 
   responses:
+    Unauthorized:
+      description: Chua dang nhap hoac token het han (`UNAUTHORIZED` / `TOKEN_EXPIRED`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Khong du quyen (`FORBIDDEN`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     NotFound:
       description: Khong tim thay du lieu
       content:
@@ -1487,6 +2397,35 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    SkillLevel:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO]
+      description: Moi choi / Trung binh / Kha / Phui
+    Position:
+      type: string
+      enum: [GK, DF, MF, FW, ANY]
+      description: Thu mon / Hau ve / Tien ve / Tien dao / Da tu do
+    RecruitPost:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [OPEN, MATCHED, CLOSED, EXPIRED] }
+        team_name: { type: string, nullable: true }
+        author_name: { type: string }
+        venue_name: { type: string }
+        field_name: { type: string }
+        district_name: { type: string }
+        play_date: { type: string, format: date }
+        time_span: { type: string, example: '[1140,1230)', description: Phut trong ngay }
+        required_level: { $ref: '#/components/schemas/SkillLevel' }
+        slots_needed: { type: integer }
+        slots_filled: { type: integer }
+        positions: { type: array, items: { $ref: '#/components/schemas/Position' } }
+        cost_kind: { type: string, enum: [FREE, FIXED, VOLUNTARY] }
+        cost_amount: { type: number, nullable: true }
+        bumped_at: { type: string, format: date-time, nullable: true }
+        my_request_status: { type: string, nullable: true }
+        pending_requests: { type: integer, nullable: true, description: Chi co khi nguoi xem la chu bai }
     Error:
       type: object
       required: [error]
@@ -1657,6 +2596,31 @@ components:
                   multiplier:     { type: number }
                   label:          { type: string, example: Gio vang }
                   price_per_hour: { type: integer }
+            services:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:    { type: integer }
+                  name:  { type: string, example: Thue 2 bo ao bib }
+                  price: { type: integer }
+            flash_sale:
+              type: object
+              nullable: true
+              properties:
+                discount_percent:     { type: integer }
+                trigger_hours_before: { type: integer }
+                floor_price:          { type: number, nullable: true }
+                applies_field_type:   { type: string, nullable: true }
+                time_spans:
+                  type: array
+                  nullable: true
+                  description: Khung gio duoc ap dung (phut trong ngay); null = ca ngay
+                  items:
+                    type: object
+                    properties:
+                      from_minute: { type: integer }
+                      to_minute:   { type: integer }
 
     Slot:
       type: object
@@ -1682,16 +2646,38 @@ components:
         guest_name:  { type: string, description: Thong tin lien he them, khong thay the user_id }
         guest_phone: { type: string, example: '0912345678' }
         note:        { type: string }
+        service_ids:
+          type: array
+          items: { type: integer }
+          description: Dich vu cong them (lay tu `services` cua chi tiet san); gia lay tu CSDL
+        pay_full:    { type: boolean, default: false, description: Coc 100% thay vi theo ty le coc cua san }
+        looking_for_rival:
+          type: boolean
+          default: false
+          description: Tu dang bai TEAM_FINDS_TEAM len san cap keo; can co doi (`TEAM_REQUIRED` neu chua)
+        deal_note:   { type: string, example: Chia doi tien san }
+
+    Team:
+      type: object
+      properties:
+        id:               { type: integer }
+        name:             { type: string }
+        captain_id:       { type: integer }
+        district_code:    { type: string, nullable: true }
+        skill_level:      { type: string, enum: [BEGINNER, INTERMEDIATE, GOOD, SEMI_PRO] }
+        member_count:     { type: integer }
+        reputation_score: { type: integer }
+        total_matches:    { type: integer }
 
     Booking:
       type: object
       properties:
         id:              { type: integer }
         code:            { type: string, example: BK260914A7K2M }
-        kind:            { type: string, enum: [SINGLE, RECURRING] }
+        kind:            { type: string, enum: [SINGLE, RECURRING, OWNER_LOCK] }
         status:
           type: string
-          enum: [HELD, PENDING_VERIFY, CONFIRMED, COMPLETED, CANCELLED_BY_USER, CANCELLED_BY_OWNER, EXPIRED]
+          enum: [HELD, PENDING_VERIFY, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED_EXPIRED, CANCELLED_BY_USER, CANCELLED_BY_OWNER, REFUNDED]
         venue_id:        { type: integer }
         user_id:         { type: integer }
         total_amount:    { type: integer, example: 375000 }
