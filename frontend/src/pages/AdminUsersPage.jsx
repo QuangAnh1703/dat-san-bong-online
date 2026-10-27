@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Search } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { ApiError } from '../services/api';
 import { PageLayout } from '../components/ui/PageLayout';
 import { AdminCard, EmptyNote, useAdminRun } from '../components/admin/AdminShared';
 
@@ -50,8 +51,22 @@ export const AdminUsersPage = () => {
       <button
         disabled={busyId === u.id}
         onClick={() => {
-          if (!u.locked && !confirm(`Khóa tài khoản ${u.name}? Người này sẽ không đăng nhập được.`)) return;
-          run(u.id, () => setUserLocked(u.id, !u.locked));
+          if (u.locked) {
+            run(u.id, () => setUserLocked(u.id, false));
+            return;
+          }
+          if (!confirm(`Khóa tài khoản ${u.name}? Người này sẽ không đăng nhập được.`)) return;
+          run(u.id, async () => {
+            try {
+              await setUserLocked(u.id, true);
+            } catch (err) {
+              // Chủ sân còn đơn chưa diễn ra: hỏi lại, đồng ý thì khóa và hủy các đơn đó
+              if (!(err instanceof ApiError) || err.code !== 'OWNER_HAS_UPCOMING_BOOKINGS') throw err;
+              if (confirm(`${err.message}
+
+Bạn chắc chắn muốn khóa?`)) await setUserLocked(u.id, true, true);
+            }
+          });
         }}
         className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
           u.locked

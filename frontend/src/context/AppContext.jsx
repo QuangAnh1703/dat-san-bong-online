@@ -35,6 +35,9 @@ const GUEST_USER = {
   reputationScore: 0,
 };
 
+// Người chơi chưa chọn khu vực = chưa hoàn thiện hồ sơ lần đầu
+export const needsProfileSetup = (profile) => profile?.role === 'player' && !profile.districtCode;
+
 export const errorMessage = (err) =>
   err instanceof ApiError || err instanceof Error ? err.message : 'Đã có lỗi xảy ra';
 
@@ -171,17 +174,21 @@ export const AppProvider = ({ children }) => {
     return () => window.removeEventListener('storage', onStorage);
   }, [clearSession, loadProfile, showToast]);
 
+  // Trả về hồ sơ để nơi gọi biết có cần chuyển sang trang cập nhật hồ sơ (lần đầu đăng nhập) không
   const startSession = async (res) => {
     tokenStore.set(res.access_token, res.refresh_token);
-    await loadProfile();
+    return loadProfile();
   };
+
+  const completeOAuthLogin = (accessToken, refreshToken) =>
+    startSession({ access_token: accessToken, refresh_token: refreshToken });
 
   const login = async (identifier, password) => {
     const isEmail = identifier.includes('@');
     const res = await apiClient.auth.login(
       isEmail ? { email: identifier.trim(), password } : { phone_number: identifier.replace(/\s/g, ''), password },
     );
-    await startSession(res);
+    return startSession(res);
   };
 
   const registerWithPhone = async ({ phone, password, name, districtCode, role }) => {
@@ -192,7 +199,7 @@ export const AppProvider = ({ children }) => {
       district_code: districtCode || undefined,
       role,
     });
-    await startSession(res);
+    return startSession(res);
   };
 
   const requestEmailOtp = async (email) => {
@@ -207,7 +214,14 @@ export const AppProvider = ({ children }) => {
       full_name: name.trim(),
       role,
     });
-    await startSession(res);
+    return startSession(res);
+  };
+
+  const requestPasswordReset = (email) => apiClient.auth.forgotPassword(email.trim());
+
+  const resetPassword = async ({ email, otp, password }) => {
+    const { temp_token } = await apiClient.auth.verifyResetOtp(email.trim(), otp.trim());
+    await apiClient.auth.resetPassword(temp_token, password);
   };
 
   const logout = () => {
@@ -245,14 +259,16 @@ export const AppProvider = ({ children }) => {
     setPitchesLoading(true);
     setPitchesError(null);
     try {
-      const list = await apiClient.venues.getAll();
       const today = todayISO();
-      const pitches = await Promise.all(
-        (list.data || []).map(async (row) => {
-          const pitch = mapVenue(await apiClient.venues.getById(String(row.id)));
-          return { ...pitch, subPitches: await fetchSchedules(pitch, today) };
-        }),
-      );
+      const list = await apiClient.venues.getAll(today);
+      const pitches = (list.data || []).map((row) => {
+        const pitch = mapVenue(row);
+        const subPitches = pitch.subPitches.map((sub) => {
+          const schedule = row.schedule.filter((s) => String(s.field_id) === sub.id);
+          return { ...sub, slots: buildSlots(pitch, sub, today, schedule) };
+        });
+        return { ...pitch, subPitches };
+      });
       setRawPitches(pitches);
     } catch (err) {
       setRawPitches([]);
@@ -362,7 +378,7 @@ export const AppProvider = ({ children }) => {
       guest_name: input.bookerName || undefined,
       guest_phone: input.phone ? input.phone.replace(/\s/g, '') : undefined,
       note: input.note || undefined,
-      service_ids: (input.serviceIds || []).map(Number),
+      services: input.services || [],
       pay_full: !!input.payFull,
       looking_for_rival: !!input.lookingForRival,
       deal_note: input.dealNote || undefined,
@@ -388,10 +404,12 @@ export const AppProvider = ({ children }) => {
       start: input.startTime,
       end: input.endTime,
       note: input.note,
+      skip_conflicts: !!input.skipConflicts,
     });
     await reloadBookings();
     return {
       code: res.code,
+      skippedDates: res.skipped_dates || [],
       sessions: Number(res.sessions_total) || 0,
       total: Number(res.total_amount) || 0,
       deposit: Number(res.deposit_amount) || 0,
@@ -405,6 +423,13 @@ export const AppProvider = ({ children }) => {
     bankHolder: t.bank_holder || null,
     amount: Number(t.amount ?? t.deposit_amount) || 0,
     content: t.content || `SANBONG ${t.code}`,
+    code: t.code || null,
+    venueId: t.venue_id || null,
+    venueName: t.venue_name || null,
+    status: t.status || null,
+    amountReceived: Number(t.amount_received) || 0,
+    refundPendingAmount: Number(t.refund_pending_amount) || 0,
+    holdExpiresAt: t.hold_expires_at || null,
   });
 
   const getTransferInfo = async (bookingCode) => toTransfer(await apiClient.bookings.getByCode(bookingCode));
@@ -549,14 +574,21 @@ export const AppProvider = ({ children }) => {
     showToast('Đã cập nhật phân quyền.');
   };
 
-  const setUserLocked = async (userId, locked) => {
-    await apiClient.admin.updateUserStatus(userId, locked ? 'LOCKED' : 'ACTIVE');
+  // confirm = true: đã đồng ý hủy các đơn chưa diễn ra của chủ sân (backend báo OWNER_HAS_UPCOMING_BOOKINGS lần đầu)
+  const setUserLocked = async (userId, locked, confirm = false) => {
+    const res = await apiClient.admin.updateUserStatus(userId, locked ? 'LOCKED' : 'ACTIVE', confirm);
     await reloadAdmin();
-    showToast(locked ? 'Đã khóa tài khoản.' : 'Đã mở khóa tài khoản.');
+    showToast(
+      !locked
+        ? 'Đã mở khóa tài khoản.'
+        : res.cancelled_bookings > 0
+          ? `Đã khóa tài khoản và hủy ${res.cancelled_bookings} đơn đặt, người chơi đã được thông báo.`
+          : 'Đã khóa tài khoản.',
+    );
   };
 
-  const resolveComplaint = async (id, outcome, resolution) => {
-    const res = await apiClient.admin.resolveComplaint(id, outcome, resolution);
+  const resolveComplaint = async (id, outcome, resolution, extra) => {
+    const res = await apiClient.admin.resolveComplaint(id, outcome, resolution, extra);
     await Promise.all([reloadAdmin(), reloadPitches()]);
     showToast(
       outcome === 'REFUND'
@@ -587,6 +619,9 @@ export const AppProvider = ({ children }) => {
         registerWithPhone,
         requestEmailOtp,
         registerWithEmail,
+        completeOAuthLogin,
+        requestPasswordReset,
+        resetPassword,
         logout,
         updateUser,
         saveTeam,

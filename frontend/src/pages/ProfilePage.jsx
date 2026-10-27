@@ -4,6 +4,7 @@ import { errorMessage, useApp } from '../context/AppContext';
 import { Save, AlertCircle, UserCircle, Mail, Phone } from 'lucide-react';
 import { initialsOf } from '../components/Navbar';
 import { Card, PageLayout } from '../components/ui/PageLayout';
+import { MyWalletsCard } from '../components/MyWalletsCard';
 import { POSITIONS } from '../services/mappers';
 
 const INPUT =
@@ -217,6 +218,7 @@ export const ProfilePage = () => {
             </button>
           </div>
         </form>
+        <MyWalletsCard />
       </div>
     </PageLayout>
   );

@@ -173,7 +173,13 @@ export function mapVenue(v) {
     longitude: v.longitude != null ? num(v.longitude) : undefined,
     depositRate: num(v.deposit_rate, 0.3),
     priceRules: rules,
-    services: (v.services || []).map((x) => ({ id: String(x.id), name: x.name, price: num(x.price) })),
+    services: (v.services || []).map((x) => ({
+      id: String(x.id),
+      name: x.name,
+      price: num(x.price),
+      category: x.category || 'OTHER',
+      stock: x.stock == null ? null : num(x.stock),
+    })),
     flashSale: mapFlashSale(v.flash_sale),
     contractDiscounts: (v.contract_discounts || []).map((c) => ({
       minMonths: c.min_contract_months != null ? num(c.min_contract_months) : null,
@@ -289,10 +295,14 @@ export function mapBooking(b, pitches) {
     rawStatus: b.status,
     holdExpiresAt: b.hold_expires_at || undefined,
     bookingDbId: num(b.id),
-    services: (b.services || []).map((x) => ({ name: x.name, price: num(x.price) })),
+    services: (b.services || []).map((x) => ({
+      name: (x.quantity || 1) > 1 ? `${x.name} x${x.quantity}` : x.name,
+      price: num(x.price) * (x.quantity || 1),
+    })),
     discountAmount: num(b.discount_amount),
     sessionsTotal: b.kind === 'RECURRING' ? slots.length : undefined,
     hasComplaint: !!b.has_complaint,
+    conversationId: b.conversation_id ? String(b.conversation_id) : null,
     review: b.pitch_rating
       ? {
           pitchRating: num(b.pitch_rating),
@@ -536,9 +546,30 @@ export function mapOwnerBooking(b) {
     depositAmount: num(b.deposit_amount),
     slotsLabel: `${[...new Set(slots.map((s) => s.field_name))].join(', ')} · ${when}${slots.length > 1 ? ` + ${slots.length - 1} buổi` : ''}`,
     sessions: slots.length,
-    services: (b.services || []).map((x) => x.name),
+    services: (b.services || []).map((x) => ((x.quantity || 1) > 1 ? `${x.name} x${x.quantity}` : x.name)),
     paymentStatus: b.payment?.status || null,
+    amountReceived: num(b.amount_received),
+    checkedOut: !!b.checked_out_at,
     createdAt: b.created_at ? new Date(b.created_at).toLocaleString('vi-VN') : '',
+  };
+}
+
+export function mapBankTransaction(t) {
+  return {
+    id: t.id,
+    amount: num(t.amount),
+    content: t.content || '',
+    accountNumber: t.account_number || '',
+    bankName: t.bank_name || '',
+    status: t.status,
+    note: t.note || '',
+    isMock: t.provider === 'MOCK',
+    receivedAt: new Date(t.transaction_at || t.received_at).toLocaleString('vi-VN'),
+    bookingCode: t.booking_code || null,
+    bookingStatus: t.booking_status || null,
+    depositAmount: t.deposit_amount == null ? null : num(t.deposit_amount),
+    venueName: t.venue_name || null,
+    customerName: t.customer_name || null,
   };
 }
 
@@ -558,16 +589,19 @@ export function mapComplaint(c) {
     reporterPhone: c.reporter_phone || '',
     paidAmount: num(c.paid_amount),
     createdAt: c.created_at ? new Date(c.created_at).toLocaleString('vi-VN') : '',
+    infoDueAt: c.info_due_at ? new Date(c.info_due_at).toLocaleString('vi-VN') : null,
+    infoOverdue: !!c.info_overdue,
+    messageCount: num(c.message_count),
   };
 }
 
 export function mapReport(r) {
   return {
-    bookings: num(r.month?.bookings),
-    cancelled: num(r.month?.cancelled),
-    gmv: num(r.month?.gmv),
-    matchedPosts: num(r.month?.matched_posts),
-    openComplaints: num(r.month?.open_complaints),
+    bookings: num(r.summary?.bookings),
+    cancelled: num(r.summary?.cancelled),
+    gmv: num(r.summary?.gross),
+    matchedPosts: num(r.summary?.matched_posts),
+    openComplaints: num(r.open_complaints),
     occupancy: (r.occupancy || []).map((o) => ({
       label: o.label,
       rate: num(o.rate),
@@ -600,6 +634,12 @@ export function mapPendingVenue(v) {
     district: v.district_name || '',
     phone: v.phone || '',
     createdAt: v.created_at ? new Date(v.created_at).toLocaleString('vi-VN') : '',
+    ownerName: v.owner_name || '',
+    ownerContact: v.owner_phone || v.owner_email || '',
+    fields: (v.fields || []).map((f) => `${f.name} (${FIELD_TYPE_TO_PITCH[f.type] || '?'} người)`),
+    amenities: v.amenities || [],
+    bank: v.bank_account ? `${v.bank_name || ''} · ${v.bank_account} · ${v.bank_holder || ''}` : '',
+    depositPercent: Math.round(Number(v.deposit_rate ?? 0) * 100),
   };
 }
 

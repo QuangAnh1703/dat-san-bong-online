@@ -36,6 +36,19 @@ export const AdminVenuesPage = () => {
                     <div className="text-xs text-slate-400">
                       {v.address}, {v.district} · {v.phone || '—'}
                     </div>
+                    <div className="text-xs text-slate-400">
+                      Chủ sân: <span className="text-slate-200">{v.ownerName || '—'}</span>
+                      {v.ownerContact && ` · ${v.ownerContact}`}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Sân con: <span className="text-slate-200">{v.fields.join(', ') || 'chưa khai báo'}</span>
+                    </div>
+                    {v.amenities.length > 0 && (
+                      <div className="text-xs text-slate-400">Tiện ích: {v.amenities.join(', ')}</div>
+                    )}
+                    <div className="text-xs text-slate-400">
+                      Nhận cọc {v.depositPercent}%: <span className="text-slate-200">{v.bank || 'chưa khai báo'}</span>
+                    </div>
                     <div className="text-[0.8125rem] text-slate-500 font-mono">Đăng ký lúc: {v.createdAt}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

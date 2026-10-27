@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sliders, Zap, Loader2 } from 'lucide-react';
+import { Sliders, Zap, Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { minutesToHHMM } from '../services/mappers';
@@ -19,6 +19,16 @@ const toRow = (r) => ({
   multiplier: Number(r.multiplier),
 });
 
+const EMPTY_RULE = {
+  field_type: 'F7',
+  day_type: 'WEEKDAY',
+  from_time: '17:00',
+  to_time: '22:00',
+  base_price: 300000,
+  multiplier: 1,
+  label: '',
+};
+
 const NUM_INPUT =
   'w-full h-9 px-2 rounded-lg border border-slate-700 bg-slate-800 text-white tabular-nums focus:outline-none focus:border-amber-500';
 
@@ -29,6 +39,9 @@ export const OwnerPricingPage = () => {
   const [rows, setRows] = useState([]);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [savingPrice, setSavingPrice] = useState(false);
+  const [newRule, setNewRule] = useState(EMPTY_RULE);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState(null);
 
   const [flash, setFlash] = useState({ is_active: false, discount_percent: 30, trigger_hours_before: 3 });
   const [savingFlash, setSavingFlash] = useState(false);
@@ -86,6 +99,45 @@ export const OwnerPricingPage = () => {
     }
   };
 
+  const setRule = (key) => (e) => setNewRule((r) => ({ ...r, [key]: e.target.value }));
+
+  const handleAddRule = async (e) => {
+    e.preventDefault();
+    setAddError(null);
+    if (newRule.from_time >= newRule.to_time) {
+      setAddError('Giờ bắt đầu phải trước giờ kết thúc.');
+      return;
+    }
+    setAdding(true);
+    try {
+      await apiClient.pricing.create(pitchId, {
+        ...newRule,
+        base_price: Number(newRule.base_price),
+        multiplier: Number(newRule.multiplier),
+        label: newRule.label.trim() || undefined,
+      });
+      showToast('Đã thêm khung giá');
+      setNewRule(EMPTY_RULE);
+      await Promise.all([loadRows(), reloadPitches()]);
+    } catch (err) {
+      // PRICE_SLOT_OVERLAP: "Khung giờ cài đặt giá bị chồng lấp (HH:MM-HH:MM)..."
+      setAddError(errorMessage(err));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDeleteRule = async (r) => {
+    if (!window.confirm(`Xóa khung giá ${r.fieldType} · ${r.dayType} · ${r.from}-${r.to}?`)) return;
+    try {
+      await apiClient.pricing.remove(pitchId, r.id);
+      showToast('Đã xóa khung giá');
+      await Promise.all([loadRows(), reloadPitches()]);
+    } catch (err) {
+      showToast(errorMessage(err), 'error');
+    }
+  };
+
   const handleSaveFlash = async (e) => {
     e.preventDefault();
     setSavingFlash(true);
@@ -135,21 +187,31 @@ export const OwnerPricingPage = () => {
                       r.dirty ? 'border-amber-700' : 'border-slate-800'
                     }`}
                   >
-                    <div className="col-span-2">
-                      <div className="font-bold text-white">
-                        {r.fieldType} · {r.dayType}
+                    <div className="col-span-2 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-bold text-white">
+                          {r.fieldType} · {r.dayType}
+                        </div>
+                        <div className="text-slate-400 tabular-nums">
+                          {r.from} - {r.to}
+                          {r.label && ` · ${r.label}`}
+                        </div>
                       </div>
-                      <div className="text-slate-400 tabular-nums">
-                        {r.from} - {r.to}
-                        {r.label && ` · ${r.label}`}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRule(r)}
+                        aria-label="Xóa khung giá"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-950 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                     <label className="block">
                       <span className="text-[0.8125rem] text-slate-400">Giá gốc/giờ</span>
                       <input
                         type="number"
                         min={1000}
-                        step={5000}
+                        step={1000}
                         value={r.basePrice}
                         onChange={(e) => updateRow(r.id, { basePrice: Math.max(1000, parseInt(e.target.value) || 0) })}
                         className={NUM_INPUT}
@@ -185,6 +247,83 @@ export const OwnerPricingPage = () => {
               )}
               <button type="submit" disabled={savingPrice || dirtyCount === 0} className={OWNER_PRIMARY_BTN}>
                 {savingPrice ? 'Đang lưu...' : dirtyCount > 0 ? `Lưu ${dirtyCount} thay đổi` : 'Lưu bảng giá'}
+              </button>
+            </div>
+          </form>
+
+          <form onSubmit={handleAddRule} className="mt-6 pt-5 border-t border-slate-800 space-y-3 text-xs">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>Thêm khung giá</span>
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Loại sân</span>
+                <select value={newRule.field_type} onChange={setRule('field_type')} className={NUM_INPUT}>
+                  <option value="F5">Sân 5</option>
+                  <option value="F7">Sân 7</option>
+                  <option value="F11">Sân 11</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Loại ngày</span>
+                <select value={newRule.day_type} onChange={setRule('day_type')} className={NUM_INPUT}>
+                  <option value="WEEKDAY">Ngày thường</option>
+                  <option value="WEEKEND">Cuối tuần</option>
+                  <option value="HOLIDAY">Ngày lễ</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Từ giờ</span>
+                <input type="time" value={newRule.from_time} onChange={setRule('from_time')} className={NUM_INPUT} />
+              </label>
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Đến giờ</span>
+                <input type="time" value={newRule.to_time} onChange={setRule('to_time')} className={NUM_INPUT} />
+              </label>
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Giá gốc/giờ</span>
+                <input
+                  type="number"
+                  min={1000}
+                  step={1000}
+                  value={newRule.base_price}
+                  onChange={setRule('base_price')}
+                  className={NUM_INPUT}
+                />
+              </label>
+              <label className="block">
+                <span className="text-[0.8125rem] text-slate-400">Hệ số</span>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={5}
+                  step={0.05}
+                  value={newRule.multiplier}
+                  onChange={setRule('multiplier')}
+                  className={NUM_INPUT}
+                />
+              </label>
+              <label className="block col-span-2">
+                <span className="text-[0.8125rem] text-slate-400">Nhãn (tuỳ chọn)</span>
+                <input
+                  value={newRule.label}
+                  onChange={setRule('label')}
+                  maxLength={50}
+                  placeholder="VD Giờ vàng"
+                  className={NUM_INPUT}
+                />
+              </label>
+            </div>
+            {addError && (
+              <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+                <span>{addError}</span>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <button type="submit" disabled={adding} className={OWNER_PRIMARY_BTN}>
+                {adding ? 'Đang thêm...' : 'Thêm khung giá'}
               </button>
             </div>
           </form>

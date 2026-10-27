@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { apiClient } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { NotificationBell } from './NotificationBell';
 import {
@@ -19,7 +20,46 @@ import {
   FileText,
   AlertTriangle,
   BarChart2,
+  MessageCircle,
+  Coffee,
+  Trophy,
 } from 'lucide-react';
+
+// Số tin chưa đọc trong các nhóm chat trận đấu, cập nhật mỗi phút như chuông thông báo
+const ChatLink = () => {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const load = () =>
+      apiClient.community
+        .getConversations()
+        .then((res) => setUnread(res.unread || 0))
+        .catch(() => undefined);
+    load();
+    const t = setInterval(load, 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <NavLink
+      to="/tin-nhan"
+      aria-label="Tin nhắn"
+      title="Tin nhắn"
+      className={({ isActive }) =>
+        `relative p-2 rounded-lg border transition-colors ${
+          isActive
+            ? 'bg-emerald-950 border-emerald-700 text-white'
+            : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white'
+        }`
+      }
+    >
+      <MessageCircle className="w-3.5 h-3.5" />
+      {unread > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 px-1 min-w-4 text-[0.6875rem] leading-4 font-bold bg-emerald-500 text-slate-950 rounded-full tabular-nums text-center">
+          {unread > 99 ? '99+' : unread}
+        </span>
+      )}
+    </NavLink>
+  );
+};
 
 export const initialsOf = (name) =>
   name
@@ -51,7 +91,10 @@ const OWNER_LINKS = [
   { to: '/', label: 'Tổng quan', short: 'Tổng quan', icon: LayoutDashboard, end: true },
   { to: '/chu-san/don-dat', label: 'Đơn đặt sân', short: 'Đơn đặt', icon: ClipboardList },
   { to: '/chu-san/lich', label: 'Lịch sân', short: 'Lịch sân', icon: CalendarDays },
-  { to: '/chu-san/bang-gia', label: 'Bảng giá & Flash Sale', short: 'Bảng giá', icon: Sliders },
+  { to: '/chu-san/dich-vu', label: 'Căng-tin', short: 'Căng-tin', icon: Coffee },
+  // Thanh tab đáy chỉ đủ 6 ô: bảng giá mở từ menu desktop / lối tắt trên Tổng quan
+  { to: '/chu-san/bang-gia', label: 'Bảng giá & Flash Sale', short: 'Bảng giá', icon: Sliders, desktopOnly: true },
+  { to: '/chu-san/cum-san', label: 'Cụm sân', short: 'Cụm sân', icon: Building2 },
 ];
 
 const adminNavCls = ({ isActive }) =>
@@ -121,12 +164,7 @@ export const Navbar = ({ onNavigateSection }) => {
               >
                 Tìm sân
               </button>
-              <NavLink
-                to="/keo-gap"
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 transition-colors ${isActive ? 'text-amber-300' : 'text-amber-400 hover:text-amber-300'}`
-                }
-              >
+              <NavLink to="/keo-gap" className={navCls}>
                 <Zap className="w-3.5 h-3.5" />
                 <span>Kèo gấp giá hời</span>
               </NavLink>
@@ -141,6 +179,10 @@ export const Navbar = ({ onNavigateSection }) => {
               <NavLink to="/dat-dinh-ky" className={navCls}>
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Đặt định kỳ</span>
+              </NavLink>
+              <NavLink to="/bang-xep-hang" className={navCls}>
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Xếp hạng</span>
               </NavLink>
               <NavLink to="/lich-cua-toi" onClick={guarded} className={navCls}>
                 <span>Lịch của tôi</span>
@@ -183,6 +225,7 @@ export const Navbar = ({ onNavigateSection }) => {
           <div className="flex items-center gap-2 sm:gap-3">
             {isLoggedIn ? (
               <>
+                {role === 'player' && <ChatLink />}
                 <NotificationBell />
                 <NavLink
                   to="/ho-so"
@@ -265,8 +308,8 @@ export const Navbar = ({ onNavigateSection }) => {
 
       {role === 'owner' && (
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0b130e]/95 backdrop-blur-md border-t border-amber-950/70 pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-5 h-16 text-[0.8125rem] font-semibold">
-            {OWNER_LINKS.map(({ to, short, icon: Icon, end }) => (
+          <div className="grid grid-cols-6 h-16 text-[0.75rem] font-semibold">
+            {OWNER_LINKS.filter((l) => !l.desktopOnly).map(({ to, short, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} className={ownerTabCls}>
                 <Icon className="w-5 h-5" />
                 <span>{short}</span>

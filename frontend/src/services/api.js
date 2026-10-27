@@ -130,6 +130,7 @@ const put = (body) => ({ method: 'PUT', body: JSON.stringify(body) });
 export const apiClient = {
   getHealth: () => fetchApi('/health'),
   getDistricts: () => fetchApi('/api/districts'),
+  getAmenities: () => fetchApi('/api/amenities'),
 
   auth: {
     login: (credentials) => fetchApi('/api/auth/login', post(credentials)),
@@ -137,6 +138,12 @@ export const apiClient = {
     requestOtp: (email) => fetchApi('/api/auth/request-otp', post({ email })),
     verifyOtp: (email, otp) => fetchApi('/api/auth/verify-otp', post({ email, otp })),
     registerWithOtp: (data) => fetchApi('/api/auth/register-with-otp', post(data)),
+    forgotPassword: (email) => fetchApi('/api/auth/forgot-password', post({ email })),
+    verifyResetOtp: (email, otp) => fetchApi('/api/auth/verify-reset-otp', post({ email, otp })),
+    resetPassword: (tempToken, password) =>
+      fetchApi('/api/auth/reset-password', post({ temp_token: tempToken, password })),
+    // Chuyển hẳn trang sang backend; backend redirect về /auth/google-callback kèm token
+    googleLoginUrl: () => `${BASE_URL}/api/auth/google`,
   },
 
   profile: {
@@ -159,18 +166,37 @@ export const apiClient = {
     rejectOwnerRequest: (id, reason) => fetchApi(`/api/admin/owner-requests/${id}/reject`, post({ reason })),
     getUsers: () => fetchApi('/api/admin/users?limit=100'),
     updateUserRole: (id, role) => fetchApi(`/api/admin/users/${id}/role`, put({ role })),
-    updateUserStatus: (id, status) => fetchApi(`/api/admin/users/${id}/status`, put({ status })),
+    updateUserStatus: (id, status, confirm = false) =>
+      fetchApi(`/api/admin/users/${id}/status`, put({ status, confirm })),
     getComplaints: () => fetchApi('/api/admin/complaints'),
-    resolveComplaint: (id, outcome, resolution) =>
-      fetchApi(`/api/admin/complaints/${id}/resolve`, post({ outcome, resolution })),
-    getReports: () => fetchApi('/api/admin/reports'),
+    getComplaint: (id) => fetchApi(`/api/admin/complaints/${id}`),
+    requestComplaintInfo: (id, message) => fetchApi(`/api/admin/complaints/${id}/request-info`, post({ message })),
+    // extra: { penalty_user_id, penalty_points, lock_user_id }
+    resolveComplaint: (id, outcome, resolution, extra = {}) =>
+      fetchApi(`/api/admin/complaints/${id}/resolve`, post({ outcome, resolution, ...extra })),
+    getReports: (range = {}) => fetchApi(`/api/admin/reports?${new URLSearchParams(range)}`),
+    exportReport: async (range) => {
+      // CSV tải trực tiếp (<= 1 năm) hoặc 202 khi báo cáo được gửi qua email
+      const token = tokenStore.get();
+      const res = await fetch(`${BASE_URL}/api/admin/reports/export?${new URLSearchParams(range)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.status === 202) return { queued: true, ...(await res.json()) };
+      if (!res.ok) {
+        const e = (await res.json().catch(() => null))?.error;
+        throw new ApiError(e?.code || 'UNKNOWN', e?.message || 'Xuất báo cáo thất bại', res.status, e?.details);
+      }
+      return { queued: false, blob: await res.blob() };
+    },
   },
 
   venues: {
-    getAll: () => fetchApi('/api/venues'),
+    getAll: (date) => fetchApi(`/api/venues${date ? `?date=${date}` : ''}`),
     getFlashSales: () => fetchApi('/api/venues/flash-sales'),
     getById: (id) => fetchApi(`/api/venues/${id}`),
     getRevenue: (id) => fetchApi(`/api/venues/${id}/revenue`),
+    create: (data) => fetchApi('/api/venues', post(data)),
+    update: (id, data) => fetchApi(`/api/venues/${id}`, put(data)),
   },
 
   fields: {
@@ -182,6 +208,8 @@ export const apiClient = {
   pricing: {
     list: (venueId) => fetchApi(`/api/pricing/${venueId}`),
     update: (venueId, id, data) => fetchApi(`/api/pricing/${venueId}/${id}`, put(data)),
+    create: (venueId, data) => fetchApi(`/api/pricing/${venueId}`, post(data)),
+    remove: (venueId, id) => fetchApi(`/api/pricing/${venueId}/${id}`, { method: 'DELETE' }),
   },
 
   bookings: {
@@ -195,10 +223,72 @@ export const apiClient = {
 
   payments: {
     reportTransfer: (bookingCode) => fetchApi('/api/payments', post({ booking_code: bookingCode })),
+    startVnpay: (bookingCode) => fetchApi('/api/payments/vnpay', post({ booking_code: bookingCode })),
+    bankConfig: () => fetchApi('/api/payments/bank/config'),
+    mockTransfer: (data) => fetchApi('/api/payments/bank/mock-transfer', post(data)),
+    bankTransactions: (status) =>
+      fetchApi(`/api/payments/bank/transactions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    assignTransaction: (id, bookingCode) =>
+      fetchApi(`/api/payments/bank/transactions/${id}/assign`, post({ booking_code: bookingCode })),
+    resolveTransaction: (id, action, note) =>
+      fetchApi(`/api/payments/bank/transactions/${id}/resolve`, post({ action, note })),
+  },
+
+  pos: {
+    services: (venueId) => fetchApi(`/api/owner/venues/${venueId}/services`),
+    createService: (venueId, data) => fetchApi(`/api/owner/venues/${venueId}/services`, post(data)),
+    updateService: (id, data) => fetchApi(`/api/owner/services/${id}`, put(data)),
+    board: (venueId) => fetchApi(`/api/owner/venues/${venueId}/pos`),
+    createOrder: (venueId, data) => fetchApi(`/api/owner/venues/${venueId}/pos-orders`, post(data)),
+    checkoutSummary: (code) => fetchApi(`/api/owner/bookings/${code}/checkout`),
+    checkout: (code, data) => fetchApi(`/api/owner/bookings/${code}/checkout`, post(data)),
+  },
+
+  splits: {
+    mine: () => fetchApi('/api/splits/mine'),
+    get: (code) => fetchApi(`/api/splits/booking/${code}`),
+    candidates: (code) => fetchApi(`/api/splits/booking/${code}/candidates`),
+    create: (code, data) => fetchApi(`/api/splits/booking/${code}`, post(data)),
+    markPaid: (id) => fetchApi(`/api/splits/shares/${id}/mark-paid`, post()),
+    payFor: (id) => fetchApi(`/api/splits/shares/${id}/pay-for`, post()),
+    reassign: (id, data) => fetchApi(`/api/splits/shares/${id}/reassign`, post(data)),
+  },
+
+  wallets: {
+    plans: (venueId) => fetchApi(`/api/wallets/venues/${venueId}/plans`),
+    mine: () => fetchApi('/api/wallets/mine'),
+    myAtVenue: (venueId) => fetchApi(`/api/wallets/venues/${venueId}/me`),
+    topup: (planId) => fetchApi('/api/wallets/topups', post({ plan_id: planId })),
+    topupStatus: (code) => fetchApi(`/api/wallets/topups/${code}`),
+    pay: (bookingCode) => fetchApi('/api/wallets/pay', post({ booking_code: bookingCode })),
+    ownerPlans: (venueId) => fetchApi(`/api/wallets/owner/venues/${venueId}/plans`),
+    createPlan: (venueId, data) => fetchApi(`/api/wallets/owner/venues/${venueId}/plans`, post(data)),
+    updatePlan: (id, data) => fetchApi(`/api/wallets/owner/plans/${id}`, put(data)),
+    frozen: () => fetchApi('/api/wallets/admin/frozen'),
+    adminRefund: (id, note) => fetchApi(`/api/wallets/admin/${id}/refund`, post({ note })),
+  },
+
+  league: {
+    leaderboard: (sort, district) =>
+      fetchApi(`/api/leaderboard?sort=${sort}${district ? `&district=${encodeURIComponent(district)}` : ''}`),
+    myResults: () => fetchApi('/api/matches/results/mine'),
+    submitResult: (code, home, away) =>
+      fetchApi(`/api/matches/${code}/result`, post({ home_score: home, away_score: away })),
+    tournaments: (params = '') => fetchApi(`/api/tournaments${params}`),
+    tournament: (id) => fetchApi(`/api/tournaments/${id}`),
+    createTournament: (data) => fetchApi('/api/tournaments', post(data)),
+    register: (id) => fetchApi(`/api/tournaments/${id}/register`, post()),
+    schedule: (id) => fetchApi(`/api/tournaments/${id}/schedule`, post()),
+    matchResult: (id, home, away) =>
+      fetchApi(`/api/tournaments/matches/${id}/result`, post({ home_score: home, away_score: away })),
+    forfeit: (id, teamId) => fetchApi(`/api/tournaments/matches/${id}/forfeit`, post(teamId ? { team_id: teamId } : {})),
   },
 
   complaints: {
     create: (data) => fetchApi('/api/complaints', post(data)),
+    getMine: () => fetchApi('/api/complaints/me'),
+    get: (id) => fetchApi(`/api/complaints/${id}`),
+    reply: (id, data) => fetchApi(`/api/complaints/${id}/messages`, post(data)),
   },
 
   community: {
@@ -207,6 +297,9 @@ export const apiClient = {
     sendRequest: (data) => fetchApi('/api/community/requests', post(data)),
     getRequestsForPost: (postId) => fetchApi(`/api/community/requests?post_id=${postId}`),
     respondRequest: (id, status) => fetchApi(`/api/community/requests/${id}`, put({ status })),
+    getConversations: () => fetchApi('/api/community/conversations'),
+    getMessages: (id, after = 0) => fetchApi(`/api/community/conversations/${id}/messages?after=${after}`),
+    sendMessage: (id, content) => fetchApi(`/api/community/conversations/${id}/messages`, post({ content })),
   },
 
   freelance: {
@@ -229,7 +322,9 @@ export const apiClient = {
   },
 
   owner: {
+    getVenues: () => fetchApi('/api/owner/venues'),
     getBookings: (venueId) => fetchApi(`/api/owner/bookings?venue_id=${venueId}`),
+    getReport: (venueId, period) => fetchApi(`/api/owner/reports?venue_id=${venueId}&period=${period}`),
     confirmBooking: (code) => fetchApi(`/api/owner/bookings/${code}/confirm`, post()),
     rejectBooking: (code, reason) => fetchApi(`/api/owner/bookings/${code}/reject`, post({ reason })),
     lockSlot: (data) => fetchApi('/api/owner/locks', post(data)),

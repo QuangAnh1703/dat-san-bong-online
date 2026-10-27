@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Building2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PageLayout } from '../ui/PageLayout';
@@ -41,7 +42,12 @@ export const OwnerPage = ({ icon, eyebrow, description, actions, children }) => 
             {pitchesLoading ? 'Đang tải cụm sân...' : 'Bạn chưa có cụm sân nào đang hoạt động'}
           </h2>
           {!pitchesLoading && (
-            <p className="text-xs text-slate-400 mt-1">Cụm sân chỉ hiển thị ở đây sau khi được Admin duyệt.</p>
+            <>
+              <p className="text-xs text-slate-400 mt-1">Cụm sân chỉ hiển thị ở đây sau khi được Admin duyệt.</p>
+              <Link to="/chu-san/cum-san" className={`${OWNER_PRIMARY_BTN} inline-flex mt-4`}>
+                Đăng ký / xem trạng thái cụm sân
+              </Link>
+            </>
           )}
         </div>
       </PageLayout>

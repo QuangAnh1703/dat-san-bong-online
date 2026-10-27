@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ClipboardList, Check, X, Loader2, User, Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRightLeft, LogOut, ClipboardList, Check, X, Loader2, User, Wallet } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { mapOwnerBooking } from '../services/mappers';
 import { Modal } from '../components/ui/Modal';
+import { CheckoutModal } from '../components/owner/CheckoutModal';
 import {
   OwnerPage,
   OWNER_INPUT,
+  OWNER_PRIMARY_BTN,
   OWNER_SECONDARY_BTN,
   TODO_STATUSES,
   statusOf,
@@ -15,6 +18,7 @@ import {
 const FILTERS = [
   { key: 'todo', label: 'Cần xử lý', match: (b) => TODO_STATUSES.includes(b.status) },
   { key: 'confirmed', label: 'Đã xác nhận', match: (b) => b.status === 'CONFIRMED' },
+  { key: 'completed', label: 'Đã đá xong', match: (b) => b.status === 'COMPLETED' },
   { key: 'all', label: 'Tất cả', match: () => true },
 ];
 
@@ -28,6 +32,7 @@ export const OwnerBookingsPage = () => {
   const [busy, setBusy] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [reason, setReason] = useState('');
+  const [checkoutCode, setCheckoutCode] = useState(null);
 
   const refresh = async () => {
     if (!pitchId) return;
@@ -82,7 +87,13 @@ export const OwnerBookingsPage = () => {
     <OwnerPage
       icon={ClipboardList}
       eyebrow="Duyệt & quản lý đơn đặt sân"
-      description="Kiểm tra tài khoản nhận tiền rồi xác nhận các đơn khách đã báo chuyển cọc."
+      description="Chuyển khoản đúng nội dung được tự xác nhận; đơn còn lại kiểm tra tài khoản rồi xác nhận tay."
+      actions={
+        <Link to="/chu-san/doi-soat" className={`${OWNER_PRIMARY_BTN} inline-flex items-center gap-1.5`}>
+          <ArrowRightLeft className="w-3.5 h-3.5" />
+          <span>Đối soát chuyển khoản</span>
+        </Link>
+      }
     >
       <div className="space-y-4">
         <div className="flex gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-semibold w-full sm:w-auto sm:inline-flex overflow-x-auto">
@@ -115,6 +126,7 @@ export const OwnerBookingsPage = () => {
           visible.map((b) => {
             const st = statusOf(b.status);
             const actionable = ['HELD', 'PENDING_VERIFY', 'CONFIRMED'].includes(b.status);
+            const canCheckout = ['CONFIRMED', 'COMPLETED'].includes(b.status) && !b.checkedOut;
             return (
               <div
                 key={b.code}
@@ -152,6 +164,12 @@ export const OwnerBookingsPage = () => {
                       <span className="text-emerald-400 font-bold tabular-nums">
                         {b.depositAmount.toLocaleString('vi-VN')}đ
                       </span>
+                      {b.amountReceived > 0 && b.amountReceived < b.depositAmount && (
+                        <span className="text-amber-400 font-semibold">
+                          {' '}
+                          · Thanh toán thiếu: đã nhận {b.amountReceived.toLocaleString('vi-VN')}đ
+                        </span>
+                      )}
                     </span>
                   </div>
                   {(b.services.length > 0 || b.note) && (
@@ -164,7 +182,7 @@ export const OwnerBookingsPage = () => {
                   <div className="text-[0.8125rem] text-slate-500">Đặt lúc {b.createdAt}</div>
                 </div>
 
-                {actionable && (
+                {(actionable || canCheckout) && (
                   <div className="flex sm:flex-col items-stretch sm:items-end gap-2 shrink-0">
                     {b.status !== 'CONFIRMED' && (
                       <button
@@ -176,6 +194,16 @@ export const OwnerBookingsPage = () => {
                         <span>Đã nhận cọc</span>
                       </button>
                     )}
+                    {canCheckout && (
+                      <button
+                        onClick={() => setCheckoutCode(b.code)}
+                        className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-amber-700 text-amber-300 hover:bg-amber-950/60 font-semibold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Check-out</span>
+                      </button>
+                    )}
+                    {actionable && (
                     <button
                       disabled={busy === b.code}
                       onClick={() => {
@@ -187,6 +215,7 @@ export const OwnerBookingsPage = () => {
                       <X className="w-3.5 h-3.5" />
                       <span>{b.status === 'CONFIRMED' ? 'Hủy đơn' : 'Từ chối'}</span>
                     </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -194,6 +223,8 @@ export const OwnerBookingsPage = () => {
           })
         )}
       </div>
+
+      {checkoutCode && <CheckoutModal code={checkoutCode} onClose={() => setCheckoutCode(null)} onDone={refresh} />}
 
       {rejectTarget && (
         <Modal

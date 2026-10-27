@@ -10,13 +10,16 @@ import {
   Loader2,
   Wallet,
   MessageSquareWarning,
+  MessageCircle,
   Star,
   UserPlus,
   MapPin,
   Phone,
+  HandCoins,
 } from 'lucide-react';
 import { PageLayout } from '../components/ui/PageLayout';
 import { Modal } from '../components/ui/Modal';
+import { MyMatchTasks } from '../components/MyMatchTasks';
 
 const STATUS_LABEL = {
   HELD: { text: 'Đang giữ chỗ · Chờ cọc', cls: 'bg-amber-950 text-amber-400 border border-amber-800' },
@@ -188,6 +191,7 @@ export const MyBookingsPage = () => {
       description="Thanh toán cọc, theo dõi trạng thái, hủy lịch, đánh giá sân hoặc gửi khiếu nại."
     >
       <div className="space-y-4">
+        <MyMatchTasks />
         {bookingsLoading && bookings.length === 0 ? (
           <div className="py-12 flex items-center justify-center gap-2 text-xs text-slate-400">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -266,9 +270,12 @@ export const MyBookingsPage = () => {
                           </span>
                         )}
                         {booking.hasComplaint && (
-                          <span className="text-[0.75rem] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                            Đã gửi khiếu nại
-                          </span>
+                          <Link
+                            to="/khieu-nai"
+                            className="text-[0.75rem] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 hover:text-white"
+                          >
+                            Đã gửi khiếu nại · xem
+                          </Link>
                         )}
                       </div>
 
@@ -345,7 +352,7 @@ export const MyBookingsPage = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-wrap sm:flex-col items-stretch sm:items-end gap-2 shrink-0">
+                    <div className="flex flex-wrap sm:flex-col items-stretch sm:items-end gap-2 shrink-0 *:min-w-[7.5rem] *:whitespace-nowrap sm:*:min-w-0">
                       {owned && booking.rawStatus === 'HELD' && (
                         <button
                           onClick={() => setPayingId(payingId === booking.id ? null : booking.id)}
@@ -372,6 +379,24 @@ export const MyBookingsPage = () => {
                           <QrCode className="w-3.5 h-3.5" />
                           <span>Mã check-in</span>
                         </button>
+                      )}
+                      {booking.conversationId && (
+                        <Link
+                          to={`/tin-nhan/${booking.conversationId}`}
+                          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-emerald-800 text-emerald-300 hover:bg-emerald-950/60 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>Nhắn tin</span>
+                        </Link>
+                      )}
+                      {!booking.sessionsTotal && ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.rawStatus) && (
+                        <Link
+                          to={`/chia-tien/${booking.id}`}
+                          className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg border border-emerald-800 text-emerald-300 hover:bg-emerald-950/60 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                        >
+                          <HandCoins className="w-3.5 h-3.5" />
+                          <span>{owned ? 'Chia tiền' : 'Sổ quỹ'}</span>
+                        </Link>
                       )}
                       {canRecruit && (
                         <Link

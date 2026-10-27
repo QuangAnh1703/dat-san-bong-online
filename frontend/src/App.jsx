@@ -19,12 +19,27 @@ import { OwnerDashboard } from './pages/OwnerDashboard';
 import { OwnerBookingsPage } from './pages/OwnerBookingsPage';
 import { OwnerSchedulePage } from './pages/OwnerSchedulePage';
 import { OwnerPricingPage } from './pages/OwnerPricingPage';
+import { OwnerVenuesPage } from './pages/OwnerVenuesPage';
+import { OwnerVenueFormPage } from './pages/OwnerVenueFormPage';
+import { GoogleCallbackPage } from './pages/GoogleCallbackPage';
+import { MessagesPage } from './pages/MessagesPage';
+import { ComplaintsPage } from './pages/ComplaintsPage';
+import { PaymentResultPage } from './pages/PaymentResultPage';
+import { AdminComplaintDetailPage } from './pages/AdminComplaintDetailPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminOwnerRequestsPage } from './pages/AdminOwnerRequestsPage';
 import { AdminVenuesPage } from './pages/AdminVenuesPage';
 import { AdminComplaintsPage } from './pages/AdminComplaintsPage';
 import { AdminReportsPage } from './pages/AdminReportsPage';
+import { ReconciliationPage } from './pages/ReconciliationPage';
+import { OwnerServicesPage } from './pages/OwnerServicesPage';
+import { OwnerMembershipPage } from './pages/OwnerMembershipPage';
+import { OwnerTournamentsPage } from './pages/OwnerTournamentsPage';
+import { SplitBillPage } from './pages/SplitBillPage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
+import { TournamentDetailPage } from './pages/TournamentDetailPage';
+import { AdminWalletsPage } from './pages/AdminWalletsPage';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 // Trang cần tài khoản: chưa đăng nhập thì về trang chủ và mở hộp thoại đăng nhập
@@ -51,12 +66,28 @@ const RequireAdmin = ({ children }) => {
   return role === 'admin' ? children : <Navigate to="/" replace />;
 };
 
+const OWNER_PAGES = [
+  ['/chu-san/don-dat', OwnerBookingsPage],
+  ['/chu-san/lich', OwnerSchedulePage],
+  ['/chu-san/bang-gia', OwnerPricingPage],
+  ['/chu-san/cum-san', OwnerVenuesPage],
+  ['/chu-san/cum-san/moi', OwnerVenueFormPage],
+  ['/chu-san/cum-san/:id', OwnerVenueFormPage],
+  ['/chu-san/doi-soat', ReconciliationPage],
+  ['/chu-san/dich-vu', OwnerServicesPage],
+  ['/chu-san/goi-thanh-vien', OwnerMembershipPage],
+  ['/chu-san/giai-dau', OwnerTournamentsPage],
+];
+
 const ADMIN_PAGES = [
   ['/quan-tri/nguoi-dung', AdminUsersPage],
   ['/quan-tri/chu-san', AdminOwnerRequestsPage],
   ['/quan-tri/cum-san', AdminVenuesPage],
   ['/quan-tri/khieu-nai', AdminComplaintsPage],
+  ['/quan-tri/khieu-nai/:id', AdminComplaintDetailPage],
   ['/quan-tri/bao-cao', AdminReportsPage],
+  ['/quan-tri/doi-soat', ReconciliationPage],
+  ['/quan-tri/vi-hoi-vien', AdminWalletsPage],
 ];
 
 const Shell = () => {
@@ -136,6 +167,16 @@ const Shell = () => {
             </RequireAuth>
           }
         />
+        <Route path="/bang-xep-hang" element={<LeaderboardPage />} />
+        <Route path="/giai-dau/:id" element={<TournamentDetailPage />} />
+        <Route
+          path="/chia-tien/:code"
+          element={
+            <RequireAuth>
+              <SplitBillPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/lich-cua-toi"
           element={
@@ -152,30 +193,38 @@ const Shell = () => {
             </RequireAuth>
           }
         />
+        <Route path="/auth/google-callback" element={<GoogleCallbackPage />} />
+        <Route path="/thanh-toan/ket-qua" element={<PaymentResultPage />} />
+        {['/tin-nhan', '/tin-nhan/:id'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <RequireAuth>
+                <MessagesPage />
+              </RequireAuth>
+            }
+          />
+        ))}
         <Route
-          path="/chu-san/don-dat"
+          path="/khieu-nai"
           element={
-            <RequireOwner>
-              <OwnerBookingsPage />
-            </RequireOwner>
+            <RequireAuth>
+              <ComplaintsPage />
+            </RequireAuth>
           }
         />
-        <Route
-          path="/chu-san/lich"
-          element={
-            <RequireOwner>
-              <OwnerSchedulePage />
-            </RequireOwner>
-          }
-        />
-        <Route
-          path="/chu-san/bang-gia"
-          element={
-            <RequireOwner>
-              <OwnerPricingPage />
-            </RequireOwner>
-          }
-        />
+        {OWNER_PAGES.map(([path, Page]) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <RequireOwner>
+                <Page />
+              </RequireOwner>
+            }
+          />
+        ))}
         {ADMIN_PAGES.map(([path, Page]) => (
           <Route
             key={path}

@@ -1,18 +1,67 @@
 import React, { useState } from 'react';
-import { errorMessage, useApp } from '../context/AppContext';
-import { User, Building2, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { errorMessage, needsProfileSetup, useApp } from '../context/AppContext';
+import { apiClient } from '../services/api';
+import { User, Building2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Modal } from './ui/Modal';
 
-export const AuthModal = ({ onClose }) => {
-  const { login, registerWithPhone, requestEmailOtp, registerWithEmail, showToast } = useApp();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^0[35789][0-9]{8}$/;
 
+// Câu báo lỗi lấy đúng theo PRD (flows.md mục 1.1); backend kiểm tra lại cùng quy tắc
+function validateNewPassword(password, confirm) {
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Mật khẩu quá yếu! Vui lòng sử dụng ít nhất 8 ký tự bao gồm cả chữ và số.';
+  }
+  if (password !== confirm) return 'Mật khẩu xác nhận không trùng khớp!';
+  return null;
+}
+
+const inputCls =
+  'w-full h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-emerald-500 focus:outline-none';
+const labelCls = 'text-slate-300 font-semibold block mb-1';
+
+const GoogleIcon = () => (
+  <svg viewBox="0 0 48 48" className="w-4 h-4" aria-hidden="true">
+    <path
+      fill="#FFC107"
+      d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"
+    />
+    <path
+      fill="#FF3D00"
+      d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+    />
+    <path
+      fill="#4CAF50"
+      d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"
+    />
+    <path
+      fill="#1976D2"
+      d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"
+    />
+  </svg>
+);
+
+export const AuthModal = ({ onClose }) => {
+  const {
+    login,
+    registerWithPhone,
+    requestEmailOtp,
+    registerWithEmail,
+    requestPasswordReset,
+    resetPassword,
+    showToast,
+  } = useApp();
+  const navigate = useNavigate();
+
+  // login | register | forgot
   const [mode, setMode] = useState('login');
   const [method, setMethod] = useState('phone');
   const [selectedRole, setSelectedRole] = useState('PLAYER');
 
-  // Form fields
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -22,9 +71,15 @@ export const AuthModal = ({ onClose }) => {
   const [error, setError] = useState(null);
 
   const isEmailRegister = mode === 'register' && method === 'email';
+  const needsOtp = isEmailRegister || mode === 'forgot';
+  const isNewPassword = mode !== 'login';
 
   const switchMode = (next) => {
     setMode(next);
+    setPassword('');
+    setConfirmPassword('');
+    setOtp('');
+    setOtpSent(false);
     setError(null);
   };
 
@@ -38,15 +93,18 @@ export const AuthModal = ({ onClose }) => {
 
   const handleSendOtp = async () => {
     setError(null);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) {
+    if (!EMAIL_RE.test(identifier.trim())) {
       setError('Vui lòng nhập email hợp lệ.');
       return;
     }
     setSendingOtp(true);
     try {
-      await requestEmailOtp(identifier);
+      if (mode === 'forgot') await requestPasswordReset(identifier);
+      else await requestEmailOtp(identifier);
       setOtpSent(true);
-      showToast('Đã gửi mã OTP tới email của bạn.');
+      showToast(
+        mode === 'forgot' ? 'Nếu email đã đăng ký, mã OTP đã được gửi tới hộp thư.' : 'Đã gửi mã OTP tới email của bạn.',
+      );
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -54,27 +112,46 @@ export const AuthModal = ({ onClose }) => {
     }
   };
 
+  const afterLogin = (profile) => {
+    onClose();
+    if (needsProfileSetup(profile)) {
+      navigate('/ho-so');
+      showToast('Chào mừng bạn! Hãy cập nhật khu vực, trình độ và vị trí sở trường để được gợi ý sân phù hợp.');
+    }
+  };
+
+  const validate = () => {
+    if (mode === 'register' && method === 'phone' && !MOBILE_RE.test(identifier.replace(/\s/g, ''))) {
+      return 'Số điện thoại phải bao gồm đúng 10 chữ số (VD: 0912345678).';
+    }
+    if (needsOtp && !otpSent) return 'Vui lòng bấm "Gửi mã" để nhận OTP qua email.';
+    if (isNewPassword) return validateNewPassword(password, confirmPassword);
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-    if (isEmailRegister && !otpSent) {
-      setError('Vui lòng bấm "Gửi mã" để nhận OTP qua email.');
-      return;
-    }
+    const invalid = validate();
+    setError(invalid);
+    if (invalid) return;
     setSubmitting(true);
     try {
       if (mode === 'login') {
-        await login(identifier, password);
+        const profile = await login(identifier, password);
         showToast('Đăng nhập thành công!');
-      } else if (method === 'email') {
-        await registerWithEmail({ email: identifier, otp, password, name, role: selectedRole });
-        showToast('Đăng ký tài khoản mới thành công!');
+        afterLogin(profile);
+      } else if (mode === 'forgot') {
+        await resetPassword({ email: identifier, otp, password });
+        showToast('Đã đặt lại mật khẩu. Hãy đăng nhập bằng mật khẩu mới.');
+        switchMode('login');
       } else {
-        await registerWithPhone({ phone: identifier, password, name, role: selectedRole });
+        const profile =
+          method === 'email'
+            ? await registerWithEmail({ email: identifier, otp, password, name, role: selectedRole })
+            : await registerWithPhone({ phone: identifier, password, name, role: selectedRole });
         showToast('Đăng ký tài khoản mới thành công!');
+        afterLogin(profile);
       }
-      setPassword('');
-      onClose();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -82,9 +159,18 @@ export const AuthModal = ({ onClose }) => {
     }
   };
 
+  const identifierLabel =
+    mode === 'login' ? 'Email hoặc Số điện thoại:' : mode === 'forgot' || method === 'email' ? 'Email:' : 'Số điện thoại:';
+  const identifierType = mode === 'login' ? 'text' : mode === 'forgot' || method === 'email' ? 'email' : 'tel';
+  const identifierPlaceholder =
+    mode === 'login'
+      ? '0988xxxxxx hoặc email@domain.com'
+      : mode === 'forgot' || method === 'email'
+        ? 'ban@gmail.com'
+        : '0912345678';
+
   return (
     <Modal onClose={onClose}>
-      {/* Brand header */}
       <div className="text-center mb-6">
         <div className="inline-flex items-center gap-2 mb-2">
           <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base shadow-inner">
@@ -94,32 +180,41 @@ export const AuthModal = ({ onClose }) => {
             SanBong<span className="text-emerald-400">.vn</span>
           </span>
         </div>
-        <p className="text-xs text-slate-400">Hệ thống tài khoản và phân quyền trực tuyến</p>
+        <p className="text-xs text-slate-400">
+          {mode === 'forgot' ? 'Đặt lại mật khẩu qua mã OTP gửi về email' : 'Hệ thống tài khoản và phân quyền trực tuyến'}
+        </p>
       </div>
 
-      {/* Tab Switch: Login vs Register */}
-      <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl mb-5 border border-slate-800 text-xs font-semibold">
+      {mode === 'forgot' ? (
         <button
           type="button"
           onClick={() => switchMode('login')}
-          className={`py-2 rounded-lg transition-colors cursor-pointer ${
-            mode === 'login' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-          }`}
+          className="inline-flex items-center gap-1.5 mb-4 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
         >
-          Đăng nhập
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay lại đăng nhập</span>
         </button>
-        <button
-          type="button"
-          onClick={() => switchMode('register')}
-          className={`py-2 rounded-lg transition-colors cursor-pointer ${
-            mode === 'register' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          Đăng ký tài khoản
-        </button>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl mb-5 border border-slate-800 text-xs font-semibold">
+          {[
+            ['login', 'Đăng nhập'],
+            ['register', 'Đăng ký tài khoản'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => switchMode(key)}
+              className={`py-2 rounded-lg transition-colors cursor-pointer ${
+                mode === key ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Role Selector (chỉ khi đăng ký; vai trò khi đăng nhập lấy theo tài khoản) */}
+      {/* Vai trò chỉ chọn khi đăng ký; khi đăng nhập lấy theo tài khoản */}
       {mode === 'register' && (
         <div className="mb-4">
           <label className="text-[0.8125rem] font-bold text-slate-400 uppercase tracking-wider block mb-2">
@@ -157,17 +252,17 @@ export const AuthModal = ({ onClose }) => {
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3.5 text-xs">
         {mode === 'register' && (
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">Họ và tên của bạn:</label>
+            <label className={labelCls}>Họ và tên của bạn:</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nguyễn Văn A"
-              className="w-full h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-emerald-500 focus:outline-none"
+              autoComplete="name"
+              className={inputCls}
               required
             />
           </div>
@@ -175,51 +270,41 @@ export const AuthModal = ({ onClose }) => {
 
         {mode === 'register' && (
           <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 font-semibold">
-            <button
-              type="button"
-              onClick={() => switchMethod('phone')}
-              className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
-                method === 'phone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Số điện thoại
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMethod('email')}
-              className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
-                method === 'email' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Gmail
-            </button>
+            {[
+              ['phone', 'Số điện thoại'],
+              ['email', 'Gmail'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => switchMethod(key)}
+                className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  method === key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 
         <div>
-          <label className="text-slate-300 font-semibold block mb-1">
-            {mode === 'login' ? 'Email hoặc Số điện thoại:' : method === 'email' ? 'Email:' : 'Số điện thoại:'}
-          </label>
+          <label className={labelCls}>{identifierLabel}</label>
           <div className="flex gap-2">
             <input
-              type={mode === 'login' ? 'text' : method === 'email' ? 'email' : 'tel'}
+              type={identifierType}
+              inputMode={identifierType === 'tel' ? 'numeric' : undefined}
               value={identifier}
               onChange={(e) => {
                 setIdentifier(e.target.value);
                 if (otpSent) setOtpSent(false);
               }}
-              placeholder={
-                mode === 'login'
-                  ? '0988xxxxxx hoặc email@domain.com'
-                  : method === 'email'
-                    ? 'ban@gmail.com'
-                    : '0988xxxxxx'
-              }
-              autoComplete={isEmailRegister ? 'email' : 'username'}
-              className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-emerald-500 focus:outline-none"
+              placeholder={identifierPlaceholder}
+              autoComplete={needsOtp ? 'email' : 'username'}
+              className={`${inputCls} flex-1 min-w-0`}
               required
             />
-            {isEmailRegister && (
+            {needsOtp && (
               <button
                 type="button"
                 onClick={handleSendOtp}
@@ -232,9 +317,9 @@ export const AuthModal = ({ onClose }) => {
           </div>
         </div>
 
-        {isEmailRegister && otpSent && (
+        {needsOtp && otpSent && (
           <div>
-            <label className="text-slate-300 font-semibold block mb-1">Mã OTP (6 số, gửi qua email):</label>
+            <label className={labelCls}>Mã OTP (6 số, gửi qua email):</label>
             <input
               type="text"
               inputMode="numeric"
@@ -242,26 +327,51 @@ export const AuthModal = ({ onClose }) => {
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="123456"
               autoComplete="one-time-code"
-              pattern="\d{6}"
-              className="w-full h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white tracking-widest focus:border-emerald-500 focus:outline-none"
+              className={`${inputCls} tracking-widest`}
               required
             />
           </div>
         )}
 
         <div>
-          <label className="text-slate-300 font-semibold block mb-1">Mật khẩu:</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-slate-300 font-semibold">{mode === 'forgot' ? 'Mật khẩu mới:' : 'Mật khẩu:'}</label>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => switchMode('forgot')}
+                className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
+              >
+                Quên mật khẩu?
+              </button>
+            )}
+          </div>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            minLength={mode === 'register' ? 6 : undefined}
-            className="w-full h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-emerald-500 focus:outline-none"
+            className={inputCls}
             required
           />
+          {isNewPassword && <p className="mt-1 text-slate-500">Ít nhất 8 ký tự, gồm cả chữ và số.</p>}
         </div>
+
+        {isNewPassword && (
+          <div>
+            <label className={labelCls}>Xác nhận mật khẩu:</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="new-password"
+              className={inputCls}
+              required
+            />
+          </div>
+        )}
 
         {error && (
           <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
@@ -275,9 +385,32 @@ export const AuthModal = ({ onClose }) => {
           disabled={submitting}
           className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-wait text-white font-extrabold text-xs shadow-lg shadow-emerald-950 transition-all cursor-pointer active:scale-98 mt-2"
         >
-          {submitting ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập vào hệ thống' : 'Đăng ký tài khoản ngay'}
+          {submitting
+            ? 'Đang xử lý...'
+            : mode === 'login'
+              ? 'Đăng nhập vào hệ thống'
+              : mode === 'forgot'
+                ? 'Đặt lại mật khẩu'
+                : 'Đăng ký tài khoản ngay'}
         </button>
       </form>
+
+      {mode !== 'forgot' && (
+        <>
+          <div className="flex items-center gap-3 my-4 text-[0.75rem] text-slate-500">
+            <span className="h-px flex-1 bg-slate-800" />
+            <span>hoặc</span>
+            <span className="h-px flex-1 bg-slate-800" />
+          </div>
+          <a
+            href={apiClient.auth.googleLoginUrl()}
+            className="w-full h-10 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+          >
+            <GoogleIcon />
+            <span>Tiếp tục với Google</span>
+          </a>
+        </>
+      )}
     </Modal>
   );
 };

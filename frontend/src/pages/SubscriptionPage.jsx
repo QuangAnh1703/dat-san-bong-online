@@ -55,6 +55,8 @@ export const SubscriptionPage = () => {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // Lỗi trùng lịch: cho chọn bỏ qua các ngày trùng, chỉ ký hợp đồng các buổi còn lại
+  const [conflict, setConflict] = useState(null);
   const [result, setResult] = useState(null);
 
   const pitch = pitches.find((p) => p.id === pitchId) || pitches[0];
@@ -101,8 +103,7 @@ export const SubscriptionPage = () => {
   const toggleDay = (iso) =>
     setWeekdays((prev) => (prev.includes(iso) ? prev.filter((x) => x !== iso) : [...prev, iso].sort()));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const submitBooking = async (skipConflicts) => {
     if (!isLoggedIn) {
       setIsAuthModalOpen(true);
       return;
@@ -110,6 +111,7 @@ export const SubscriptionPage = () => {
     if (!sub) return;
     setSubmitting(true);
     setError(null);
+    setConflict(null);
     try {
       setResult(
         await createRecurringBooking({
@@ -120,20 +122,27 @@ export const SubscriptionPage = () => {
           startTime,
           endTime,
           note: note.trim() || undefined,
+          skipConflicts,
         }),
       );
     } catch (err) {
       if (err instanceof ApiError && err.code === 'RECURRING_CONFLICT') {
         const dates = err.details?.dates || [];
         setError(
-          `Các buổi sau đã có người đặt: ${dates.slice(0, 6).map(formatViDate).join(', ')}${dates.length > 6 ? ` và ${dates.length - 6} buổi khác` : ''}. Hãy đổi khung giờ hoặc sân con.`,
+          `Khung giờ ngày ${dates.slice(0, 6).map(formatViDate).join(', ')}${dates.length > 6 ? ` và ${dates.length - 6} buổi khác` : ''} đã có người đặt. Hãy đổi sân con / khung giờ, hoặc bỏ qua các ngày trùng.`,
         );
+        setConflict({ count: dates.length, available: err.details?.sessions_available ?? 0 });
       } else {
         setError(errorMessage(err));
       }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    submitBooking(false);
   };
 
   const inputCls =
@@ -160,6 +169,12 @@ export const SubscriptionPage = () => {
                 Tổng hợp đồng {result.total.toLocaleString('vi-VN')}đ (đã giảm {result.discountPercent}%). Tiền cọc{' '}
                 <strong>{result.deposit.toLocaleString('vi-VN')}đ</strong>, cần chuyển trong 15 phút để giữ lịch.
               </div>
+              {result.skippedDates.length > 0 && (
+                <div className="text-emerald-300/80">
+                  Đã bỏ qua {result.skippedDates.length} ngày trùng lịch:{' '}
+                  {result.skippedDates.map(formatViDate).join(', ')}.
+                </div>
+              )}
             </div>
           </div>
           <PaymentPanel bookingCode={result.code} />
@@ -346,9 +361,21 @@ export const SubscriptionPage = () => {
             )}
 
             {error && (
-              <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
-                <span>{error}</span>
+              <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+                  <span>{error}</span>
+                </div>
+                {conflict?.available > 0 && (
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => submitBooking(true)}
+                    className="w-full py-2 rounded-lg bg-rose-900/60 hover:bg-rose-900 text-white font-semibold cursor-pointer disabled:opacity-60"
+                  >
+                    Bỏ qua {conflict.count} ngày trùng, chỉ đặt {conflict.available} buổi còn lại
+                  </button>
+                )}
               </div>
             )}
 

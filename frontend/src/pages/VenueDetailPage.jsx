@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { formatViDate, SLOT_MINUTES, toLocalISODate } from '../services/mappers';
 import { PaymentPanel } from '../components/PaymentPanel';
+import { MembershipSection } from '../components/MembershipSection';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { MapPin, Phone, Clock, ShieldCheck, Zap, CheckCircle2, AlertCircle, Lock, Loader2 } from 'lucide-react';
 import { Card, PageLayout } from '../components/ui/PageLayout';
@@ -70,7 +71,8 @@ const VenueDetail = ({ pitch }) => {
   const [bookerName, setBookerName] = useState(user.name);
   const [teamName, setTeamName] = useState(user.team?.name || '');
   const [phone, setPhone] = useState(user.phone);
-  const [selectedServices, setSelectedServices] = useState([]);
+  // { serviceId: số lượng }
+  const [selectedServices, setSelectedServices] = useState({});
   const [depositOption, setDepositOption] = useState('partial');
   const [lookingForRival, setLookingForRival] = useState(false);
   const [dealNote, setDealNote] = useState('Chia đôi tiền sân 50/50');
@@ -104,15 +106,21 @@ const VenueDetail = ({ pitch }) => {
   const selectedSubPitch = subPitches.find((s) => s.id === selectedSubPitchId) || subPitches[0];
 
   const slotPrice = selectedSlot ? selectedSlot.price : 0;
-  const servicesTotal = pitch.services
-    .filter((x) => selectedServices.includes(x.id))
-    .reduce((sum, x) => sum + x.price, 0);
+  const servicesTotal = pitch.services.reduce((sum, x) => sum + x.price * (selectedServices[x.id] || 0), 0);
+  const servicesCount = Object.values(selectedServices).reduce((a, b) => a + b, 0);
   const totalPrice = slotPrice + servicesTotal;
   // Cùng công thức với backend: cọc = tổng × tỷ lệ cọc của sân, hoặc 100% nếu chọn trả hết
   const depositAmount = depositOption === 'full' ? totalPrice : Math.round(totalPrice * pitch.depositRate);
 
-  const toggleService = (id) =>
-    setSelectedServices((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const setServiceQty = (item, qty) =>
+    setSelectedServices((prev) => {
+      const max = item.stock ?? 99;
+      const next = { ...prev };
+      const q = Math.max(0, Math.min(qty, max, 99));
+      if (q === 0) delete next[item.id];
+      else next[item.id] = q;
+      return next;
+    });
 
   const handleConfirmBooking = async () => {
     if (!selectedSlot || !selectedSubPitch) return;
@@ -137,7 +145,7 @@ const VenueDetail = ({ pitch }) => {
         bookerName,
         phone,
         note: teamName.trim() ? `Đội: ${teamName.trim()}` : undefined,
-        serviceIds: selectedServices,
+        services: Object.entries(selectedServices).map(([id, quantity]) => ({ id: Number(id), quantity })),
         payFull: depositOption === 'full',
         lookingForRival: lookingForRival && !!user.team,
         dealNote,
@@ -538,25 +546,46 @@ const VenueDetail = ({ pitch }) => {
                           Dịch vụ cộng thêm sân bóng:
                         </label>
                         <div className="space-y-2">
-                          {pitch.services.map((item) => (
-                            <label
-                              key={item.id}
-                              className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer text-xs"
-                            >
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedServices.includes(item.id)}
-                                  onChange={() => toggleService(item.id)}
-                                  className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500"
-                                />
-                                <span className="text-slate-300">{item.name}</span>
+                          {pitch.services.map((item) => {
+                            const qty = selectedServices[item.id] || 0;
+                            return (
+                              <div
+                                key={item.id}
+                                className={`flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-900 border text-xs ${
+                                  qty > 0 ? 'border-emerald-700' : 'border-slate-800'
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-slate-300 truncate">{item.name}</div>
+                                  <div className="text-[0.75rem] text-slate-500 tabular-nums">
+                                    {item.price.toLocaleString('vi-VN')}đ
+                                    {item.stock != null && item.stock <= 10 && ` · còn ${item.stock}`}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    aria-label={`Bớt ${item.name}`}
+                                    disabled={qty === 0}
+                                    onClick={() => setServiceQty(item, qty - 1)}
+                                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold cursor-pointer"
+                                  >
+                                    −
+                                  </button>
+                                  <span className="w-5 text-center font-bold text-white tabular-nums">{qty}</span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Thêm ${item.name}`}
+                                    disabled={item.stock != null && qty >= item.stock}
+                                    onClick={() => setServiceQty(item, qty + 1)}
+                                    className="w-7 h-7 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
                               </div>
-                              <span className="font-bold text-emerald-400 tabular-nums">
-                                +{item.price.toLocaleString('vi-VN')}đ
-                              </span>
-                            </label>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -588,7 +617,7 @@ const VenueDetail = ({ pitch }) => {
                         )}
                         {servicesTotal > 0 && (
                           <div className="flex justify-between text-slate-300">
-                            <span>Dịch vụ cộng thêm ({selectedServices.length} mục):</span>
+                            <span>Dịch vụ cộng thêm ({servicesCount} món):</span>
                             <span className="font-bold text-white tabular-nums">
                               +{servicesTotal.toLocaleString('vi-VN')}đ
                             </span>
@@ -661,6 +690,9 @@ const VenueDetail = ({ pitch }) => {
           </>
         )}
       </Card>
+      <div className="mt-6">
+        <MembershipSection venueId={pitch.id} venueName={pitch.name} />
+      </div>
     </PageLayout>
   );
 };

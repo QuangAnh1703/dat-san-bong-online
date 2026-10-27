@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage, useApp } from '../context/AppContext';
 import { Modal } from '../components/ui/Modal';
 import { PageLayout } from '../components/ui/PageLayout';
-import { Users, MapPin, Calendar, Clock, Award, Plus, Send, CheckCircle2, Loader2, Inbox } from 'lucide-react';
+import { Users, MapPin, Calendar, Clock, Award, Plus, Send, CheckCircle2, Loader2, Inbox, Trophy } from 'lucide-react';
 
 const REQUEST_STATUS = {
   PENDING: 'Đã gửi lời mời · Chờ phản hồi',
@@ -122,6 +122,14 @@ export const MatchmakingPage = () => {
       title="Cáp kèo & Tìm đối thủ"
       description="Các đội đã chốt sân đang chờ đối thủ: chọn kèo đúng trình độ, gửi lời mời thách đấu hoặc tự đăng tin tìm đối."
       actions={
+        <>
+        <Link
+          to="/bang-xep-hang"
+          className="px-4 py-3 rounded-xl border border-slate-700 text-slate-200 hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-2"
+        >
+          <Trophy className="w-4 h-4 text-amber-400" />
+          <span>Xếp hạng & Giải đấu</span>
+        </Link>
         <button
           onClick={openNewPost}
           className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950 transition-all"
@@ -129,6 +137,7 @@ export const MatchmakingPage = () => {
           <Plus className="w-4 h-4" />
           <span>Đăng tin tìm đối thủ</span>
         </button>
+        </>
       }
     >
       {/* Level filter tabs */}

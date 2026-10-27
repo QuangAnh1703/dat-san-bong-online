@@ -10,11 +10,16 @@ import {
   CalendarDays,
   ChevronRight,
   Zap,
+  Sliders,
+  CreditCard,
+  Trophy,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { mapOwnerBooking, minutesToHHMM, toLocalISODate, todayISO } from '../services/mappers';
 import { Card } from '../components/ui/PageLayout';
+import { OccupancyBars, RevenueBars } from '../components/ReportCharts';
 import { OwnerPage, TODO_STATUSES, statusOf } from '../components/owner/OwnerPage';
 
 const Stat = ({ icon: Icon, iconCls, label, value, valueCls = 'text-white', hint }) => (
@@ -42,6 +47,93 @@ const SectionHeader = ({ icon: Icon, title, to, linkText }) => (
 );
 
 const vnd = (n) => `${n.toLocaleString('vi-VN')}đ`;
+
+const PERIODS = [
+  { key: 'day', label: 'Hôm nay' },
+  { key: 'week', label: 'Tuần này' },
+  { key: 'month', label: 'Tháng này' },
+];
+
+// Báo cáo chủ sân (PRD 2.4): chọn Ngày / Tuần / Tháng -> lượt đặt, doanh thu cọc, lấp đầy theo khung giờ
+const OwnerReport = ({ pitchId }) => {
+  const [period, setPeriod] = useState('week');
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!pitchId) return;
+    setReport(null);
+    setError(null);
+    apiClient.owner
+      .getReport(pitchId, period)
+      .then(setReport)
+      .catch((err) => setError(errorMessage(err)));
+  }, [pitchId, period]);
+
+  const s = report?.summary;
+  return (
+    <Card>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-amber-400" />
+          <span>Báo cáo kinh doanh</span>
+        </h2>
+        <div className="grid grid-cols-3 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setPeriod(p.key)}
+              aria-pressed={period === p.key}
+              className={`px-3 py-1.5 rounded-lg cursor-pointer ${
+                period === p.key ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {error ? (
+        <div className="py-8 text-center text-xs text-rose-300">{error}</div>
+      ) : !report ? (
+        <div className="py-8 text-center text-xs text-slate-400">Đang tải báo cáo...</div>
+      ) : report.empty ? (
+        <div className="py-8 text-center text-xs text-slate-400">Chưa có dữ liệu doanh thu trong khoảng thời gian này.</div>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+            {[
+              ['Lượt đặt', s.bookings, `${s.confirmed} đã xác nhận`],
+              ['Doanh thu', vnd(s.gross), 'Đơn đã xác nhận'],
+              ['Tiền cọc đã thu', vnd(s.deposit), 'Theo ngày thanh toán'],
+              ['Doanh thu dịch vụ', vnd(s.service_revenue || 0), 'Căng-tin, thuê đồ, trọng tài'],
+              ['Lấp đầy', `${s.occupancy_rate}%`, `${s.cancelled} đơn hủy`],
+            ].map(([label, value, hint]) => (
+              <div key={label} className="p-3 rounded-xl bg-slate-950 border border-slate-800 min-w-0">
+                <div className="text-slate-400">{label}</div>
+                <div className="text-lg font-black text-white tabular-nums break-words">{value}</div>
+                <div className="text-[0.75rem] text-slate-500">{hint}</div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {report.series.length > 1 && (
+              <div>
+                <h3 className="text-xs font-bold text-slate-300 mb-2">Doanh thu theo ngày</h3>
+                <RevenueBars series={report.series} granularity={report.granularity} tone="amber" />
+              </div>
+            )}
+            <div className={report.series.length > 1 ? '' : 'lg:col-span-2'}>
+              <h3 className="text-xs font-bold text-slate-300 mb-2">Tỷ lệ lấp đầy theo khung giờ</h3>
+              <OccupancyBars bands={report.occupancy} tone="amber" />
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+};
 
 export const OwnerDashboard = () => {
   const { managedPitch, getVenueRevenue, showToast } = useApp();
@@ -130,6 +222,26 @@ export const OwnerDashboard = () => {
             hint={peakRule ? `${peakRule.label || 'Hệ số'} · x${peakRule.multiplier}` : 'Chưa cấu hình bảng giá'}
           />
         </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            ['/chu-san/bang-gia', Sliders, 'Bảng giá & Flash Sale'],
+            ['/chu-san/goi-thanh-vien', CreditCard, 'Gói thành viên'],
+            ['/chu-san/giai-dau', Trophy, 'Giải đấu'],
+            ['/chu-san/doi-soat', ArrowRightLeft, 'Đối soát chuyển khoản'],
+          ].map(([to, Icon, label]) => (
+            <Link
+              key={to}
+              to={to}
+              className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-700 text-xs font-semibold text-slate-200 flex items-center gap-2"
+            >
+              <Icon className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </div>
+
+        <OwnerReport pitchId={pitchId} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <Card>

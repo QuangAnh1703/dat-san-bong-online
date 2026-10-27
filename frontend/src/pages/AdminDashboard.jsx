@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Shield,
@@ -10,8 +10,11 @@ import {
   BarChart2,
   Clock,
   ChevronRight,
+  ArrowRightLeft,
+  Wallet,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { apiClient } from '../services/api';
 import { PageLayout } from '../components/ui/PageLayout';
 import { AdminCard } from '../components/admin/AdminShared';
 
@@ -61,6 +64,19 @@ export const AdminDashboard = () => {
   const { adminStats, ownerApplications, pendingVenues, complaints, adminReport } = useApp();
   const openComplaints = complaints.filter((c) => !['RESOLVED', 'CLOSED'].includes(c.status)).length;
   const pendingTotal = ownerApplications.length + pendingVenues.length;
+  const [bankQueue, setBankQueue] = useState(0);
+  const [frozenWallets, setFrozenWallets] = useState(0);
+
+  useEffect(() => {
+    apiClient.payments.bankTransactions().then(
+      (res) => setBankQueue(res.count || 0),
+      () => undefined,
+    );
+    apiClient.wallets.frozen().then(
+      (res) => setFrozenWallets(res.count || 0),
+      () => undefined,
+    );
+  }, []);
 
   return (
     <PageLayout
@@ -126,6 +142,21 @@ export const AdminDashboard = () => {
                 title="Khiếu nại chờ xử lý"
                 hint="Cần quyết định hoàn cọc hoặc từ chối"
                 count={openComplaints}
+                danger
+              />
+              <TodoLink
+                to="/quan-tri/doi-soat"
+                icon={ArrowRightLeft}
+                title="Đối soát chuyển khoản"
+                hint="Giao dịch không tự khớp được / chờ hoàn tiền"
+                count={bankQueue}
+              />
+              <TodoLink
+                to="/quan-tri/vi-hoi-vien"
+                icon={Wallet}
+                title="Hoàn tiền ví hội viên"
+                hint="Ví của cụm sân bị khóa còn số dư"
+                count={frozenWallets}
                 danger
               />
             </div>

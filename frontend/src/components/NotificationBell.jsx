@@ -5,9 +5,28 @@ import { apiClient } from '../services/api';
 
 const POLL_MS = 60 * 1000;
 
-// Thông báo ghép đội mở tab "Của tôi"; thông báo khác gắn với đơn thì mở lịch đặt
-const targetOf = (n) =>
-  /^(FREELANCE|INVITE|RECRUIT)_/.test(n.type) ? '/ghep-chan-le?tab=cua-toi' : n.booking_code ? '/lich-cua-toi' : null;
+// Mở trang liên quan theo loại thông báo; còn lại gắn với đơn thì mở lịch đặt
+const TARGETS = [
+  [/^SPLIT_/, null],
+  [/^MATCH_RESULT_/, '/lich-cua-toi'],
+  [/^TOURNAMENT_/, '/bang-xep-hang?tab=giai-dau'],
+  [/^WALLET_FROZEN_ADMIN$/, '/quan-tri/vi-hoi-vien'],
+  [/^WALLET_/, '/ho-so'],
+  [/^(FREELANCE|INVITE|RECRUIT)_/, '/ghep-chan-le?tab=cua-toi'],
+  [/^MATCH_ACCEPTED$/, '/tin-nhan'],
+  [/^MATCH_/, '/giao-huu'],
+  [/^COMPLAINT_REPLIED$/, '/quan-tri/khieu-nai'],
+  [/^COMPLAINT_/, '/khieu-nai'],
+  [/^REPUTATION_/, '/ho-so'],
+  [/^VENUE_/, '/chu-san/cum-san'],
+  [/^BOOKING_PAID$/, '/chu-san/don-dat'],
+  [/^REPORT_/, '/quan-tri/bao-cao'],
+];
+const targetOf = (n) => {
+  // Thông báo chia tiền mở thẳng sổ quỹ của trận
+  if (/^SPLIT_/.test(n.type) && n.booking_code) return `/chia-tien/${n.booking_code}`;
+  return TARGETS.find(([re]) => re.test(n.type))?.[1] || (n.booking_code ? '/lich-cua-toi' : null);
+};
 
 const timeAgo = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
