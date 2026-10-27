@@ -51,6 +51,10 @@ tags:
   - name: Doi bong
   - name: Khieu nai
   - name: Chu san - Van hanh
+  - name: Chu san - Dich vu
+  - name: So quy doi bong
+  - name: Vi hoi vien
+  - name: Giai dau & Xep hang
 
 paths:
   /health:
@@ -90,10 +94,21 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/District' }
 
-  /api/auth/register:
+  /api/amenities:
+    get:
+      tags: [He thong]
+      summary: Danh muc tien ich (dung khi chu san khai bao cum san)
+      responses:
+        '200':
+          description: Danh sach tien ich `{ code, name, icon }`
+
+  /api/auth/register-with-phone:
     post:
       tags: [Xac thuc]
       summary: Dang ky tai khoan bang so dien thoai
+      description: |
+        SDT phai la dau so di dong VN (`^0[35789]\d{8}$`), mat khau >= 8 ky tu gom ca chu va so.
+        `role`: `PLAYER` (mac dinh) hoac `OWNER`. Tra ve token nhu dang nhap.
       requestBody:
         required: true
         content:
@@ -104,9 +119,9 @@ paths:
           description: Tao tai khoan thanh cong
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/AuthResponse' }
         '400':
-          description: Thieu truong bat buoc, SDT sai dinh dang (`INVALID_PHONE`) hoac mat khau qua ngan (`WEAK_PASSWORD`)
+          description: Thieu truong bat buoc, SDT sai dinh dang (`INVALID_PHONE`) hoac mat khau yeu (`WEAK_PASSWORD`)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -141,10 +156,28 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '401':
-          description: Email/SDT hoac mat khau sai (`INVALID_CREDENTIALS`)
+          description: Email/SDT hoac mat khau sai (`INVALID_CREDENTIALS`); tai khoan tao qua Google chua dat mat khau cung nhan loi nay
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Tai khoan bi khoa (`ACCOUNT_LOCKED`)
+
+  /api/auth/google:
+    get:
+      tags: [Xac thuc]
+      summary: Bat dau dang nhap Google (redirect)
+      description: |
+        Chuyen huong sang Google. Khi chua cau hinh `GOOGLE_OAUTH_*` va khong phai production,
+        tra ve form dang nhap gia lap (mock) de test.
+
+  /api/auth/google/callback:
+    get:
+      tags: [Xac thuc]
+      summary: Google goi lai sau khi xac thuc
+      description: |
+        Luon redirect ve `FRONTEND_URL/auth/google-callback`:
+        thanh cong kem `?access_token=&refresh_token=`, that bai kem `?error=ACCOUNT_LOCKED | GOOGLE_LOGIN_FAILED`.
 
   /api/auth/request-otp:
     post:
@@ -181,7 +214,9 @@ paths:
     post:
       tags: [Xac thuc]
       summary: Xac minh ma OTP
-      description: Neu dung, tra ve temp_token (hieu luc 10 phut) dung de dang ky.
+      description: |
+        Tra ve `temp_token` (JWT ky bang server, song 10 phut, muc dich `register`).
+        Sai OTP tra `OTP_INVALID` kem `details.attempts_left`; sai 5 lan khoa 15 phut (`OTP_RATE_LIMITED`).
       requestBody:
         required: true
         content:
@@ -223,7 +258,7 @@ paths:
               required: [temp_token, password, full_name]
               properties:
                 temp_token:     { type: string, description: 'Tu /verify-otp' }
-                password:       { type: string, minLength: 6, example: 'password123' }
+                password:       { type: string, minLength: 8, description: 'Gom ca chu va so', example: 'password123' }
                 full_name:      { type: string, example: 'Nguyen Van A' }
                 district_code:  { type: string, example: 'CG', nullable: true }
                 role:           { type: string, enum: [PLAYER, OWNER], default: PLAYER, description: 'Mac dinh PLAYER. Chi PLAYER co the dang ky OWNER va phai duyet' }
@@ -269,7 +304,9 @@ paths:
     post:
       tags: [Xac thuc]
       summary: Xac minh OTP de dat lai mat khau
-      description: Neu dung, tra ve temp_token (hieu luc 10 phut) dung de reset-password.
+      description: |
+        Tra ve `temp_token` (JWT ky bang server, song 10 phut, muc dich `reset_password`).
+        Sai OTP tra `OTP_INVALID` kem `details.attempts_left`; sai 5 lan khoa 15 phut (`OTP_RATE_LIMITED`).
       requestBody:
         required: true
         content:
@@ -308,7 +345,7 @@ paths:
               required: [temp_token, password]
               properties:
                 temp_token: { type: string, description: 'Tu /verify-reset-otp' }
-                password:   { type: string, minLength: 6, example: 'newpassword123' }
+                password:   { type: string, minLength: 8, description: 'Gom ca chu va so', example: 'newpassword123' }
       responses:
         '200':
           description: Dat lai mat khau thanh cong
@@ -325,6 +362,10 @@ paths:
     get:
       tags: [Cum san]
       summary: Tim cum san da duoc duyet
+      description: >
+        Moi cum san tra kem san con, bang gia, dich vu, Flash Sale, chiet khau hop dong va cac slot
+        da kin trong ngay `date` (chi trang thai, khong co ten khach) de frontend dung luoi slot
+        ngay ma khong phai goi `/api/venues/{id}` va `/api/fields/{id}/schedule` cho tung san.
       parameters:
         - name: district
           in: query
@@ -334,6 +375,25 @@ paths:
           in: query
           description: Tu khoa tim trong ten hoac dia chi
           schema: { type: string }
+        - name: fieldType
+          in: query
+          description: Chi lay cum san co san con loai nay, vi du `F7`
+          schema: { type: string }
+        - name: maxPrice
+          in: query
+          description: Gia thap nhat moi gio khong vuot qua gia tri nay
+          schema: { type: number }
+        - name: minRating
+          in: query
+          schema: { type: number }
+        - name: amenities
+          in: query
+          description: Danh sach tien ich (ten hoac ma), cach nhau dau phay, vi du `PARKING,Wifi`
+          schema: { type: string }
+        - name: date
+          in: query
+          description: Ngay lay `schedule` (YYYY-MM-DD), mac dinh hom nay
+          schema: { type: string, format: date }
       responses:
         '200':
           description: Danh sach cum san, sap xep theo diem danh gia giam dan
@@ -346,6 +406,26 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/VenueSummary' }
+        '400':
+          description: '`date` sai dinh dang (`INVALID_FIELD`)'
+
+    post:
+      tags: [Cum san]
+      summary: Chu san dang ky cum san moi (trang thai PENDING cho admin duyet)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VenueInput' }
+      responses:
+        '201':
+          description: Da tao cum san `{ message, venue }`, ghi `venue_approval` SUBMIT
+        '400':
+          description: '`MISSING_FIELD` / `INVALID_FIELD`'
+        '403':
+          description: Khong phai OWNER/ADMIN
 
   /api/venues/flash-sales:
     get:
@@ -430,11 +510,44 @@ paths:
               schema: { $ref: '#/components/schemas/VenueDetail' }
         '404':
           $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Cum san]
+      summary: Sua cum san (chi chu cum san / admin)
+      description: Cum san dang `REJECTED` duoc chu san sua se tu dong chuyen ve `PENDING` (gui duyet lai).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VenueInput' }
+      responses:
+        '200':
+          description: '`{ message, venue }`'
+        '403':
+          description: Khong phai chu cum san (`FORBIDDEN`)
+    delete:
+      tags: [Cum san]
+      summary: Xoa cum san chua co don dat nao (chi chu cum san / admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/VenueId'
+      responses:
+        '200':
+          description: Da xoa
+        '400':
+          description: Cum san da co don dat (`INVALID_OPERATION`)
+        '403':
+          description: Khong phai chu cum san (`FORBIDDEN`)
 
   /api/venues/{id}/revenue:
     get:
       tags: [Cum san]
-      summary: Doanh thu theo ngay (60 ngay gan nhat)
+      summary: Doanh thu theo ngay (60 ngay gan nhat) - chi chu cum san / admin
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: '#/components/parameters/VenueId'
       responses:
@@ -667,6 +780,7 @@ paths:
       description: |
         Gom don minh dat va cac tran minh duoc chap nhan tham gia qua cap keo / ghep chan le
         (`match_participant`). Voi tran tham gia, `is_participant = true` va `host_name` la nguoi dat san.
+        Chi ADMIN duoc truyen `?user_id=` de xem don cua nguoi khac; vai tro khac bi bo qua tham so nay.
       security:
         - BearerAuth: []
       responses:
@@ -676,9 +790,13 @@ paths:
       tags: [Dat san]
       summary: Tao don dat san va giu khung gio
       description: |
+        Bat buoc dang nhap; don luon dung ten nguoi goi (khong nhan `user_id` tu body).
         Don duoc tao o trang thai `HELD` kem `hold_expires_at`.
+        Khung gio da troi qua bi tu choi (`SLOT_IN_PAST`).
         Rang buoc `EXCLUDE` o tang CSDL dam bao hai nguoi dat cung khung gio
         thi nguoi sau nhan loi `SLOT_TAKEN` - chong dat trung ngay ca khi chay song song.
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -691,7 +809,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Booking' }
         '400':
-          description: Thieu truong bat buoc hoac vi pham rang buoc
+          description: Thieu truong bat buoc, `INVALID_TIME_RANGE`, `SLOT_IN_PAST` hoac vi pham rang buoc
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -700,8 +818,8 @@ paths:
                   value:
                     error:
                       code: MISSING_FIELD
-                      message: 'Thieu truong bat buoc: user_id'
-                      details: { missing: [user_id] }
+                      message: 'Thieu truong bat buoc: field_id'
+                      details: { missing: [field_id] }
                       requestId: 3f7c9b12-1f0a-4c2e-9f11-2b7d4e8a91c3
                       timestamp: '2026-09-14T12:30:00.000Z'
         '404':
@@ -731,6 +849,9 @@ paths:
     get:
       tags: [Dat san]
       summary: Tra cuu don theo ma
+      description: Chi nguoi dat, nguoi da duoc nhan vao tran, chu cum san va admin xem duoc.
+      security:
+        - BearerAuth: []
       parameters:
         - name: code
           in: path
@@ -835,8 +956,10 @@ paths:
   /api/bookings/maintenance/release-expired:
     post:
       tags: [Dat san]
-      summary: Don cac don giu cho da qua han
-      description: Goi ham `fn_release_expired_holds()` trong CSDL. Dung cho cron hoac thao tac thu cong.
+      summary: Don cac don giu cho da qua han (ADMIN)
+      description: Goi ham `fn_release_expired_holds()` trong CSDL. Job nen da tu chay moi 60 giay; endpoint chi de admin goi tay.
+      security:
+        - BearerAuth: []
       responses:
         '200':
           description: So don da duoc giai phong
@@ -1298,6 +1421,10 @@ paths:
     post:
       tags: [Cong dong - Ghep doi]
       summary: Gui yeu cau tham gia bai dang
+      description: |
+        Cap keo doi-doi (`TEAM_FINDS_TEAM`): bat buoc co doi (`TEAM_REQUIRED`), moi tran chi gui mot lan
+        (`REQUEST_ALREADY_EXISTS`), doi khach da co lich da khac trung khung gio -> `SCHEDULE_CONFLICT`.
+        Doi chu nha nhan thong bao `MATCH_REQUEST`.
       security:
         - BearerAuth: []
       requestBody:
@@ -1390,61 +1517,36 @@ paths:
   /api/community/conversations:
     get:
       tags: [Cong dong - Ghep doi]
-      summary: Danh sach hoi thoai cua toi
+      summary: Nhom chat tran dau cua toi
+      description: |
+        Moi don dat san co mot nhom chat, tu mo khi chap nhan keo giao huu hoac nhan nguoi choi le vao tran;
+        roi nhom khi huy tham gia. Tra ve tran, thanh vien, tin cuoi va so tin chua doc (`unread` tong o goc).
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Danh sach hoi thoai
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count: { type: integer }
-                  data:
-                    type: array
-                    items: { $ref: '#/components/schemas/Conversation' }
+          description: '`{ count, unread, data: [{ id, booking_code, venue_name, starts_at, members, last_message, last_message_at, unread }] }`'
 
   /api/community/conversations/{id}/messages:
     get:
       tags: [Cong dong - Ghep doi]
-      summary: Danh sach tin nhan trong cuoc hoi thoai
+      summary: Tin nhan trong nhom (danh dau da doc)
+      description: Chi thanh vien nhom (`FORBIDDEN` neu khong). `after` = id tin cuoi da co, dung cho polling.
       security:
         - BearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: integer }
-        - name: limit
-          in: query
-          schema: { type: integer, default: 50 }
-        - name: offset
-          in: query
-          schema: { type: integer, default: 0 }
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: after, in: query, schema: { type: integer, default: 0 } }
       responses:
         '200':
-          description: Danh sach tin nhan
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count: { type: integer }
-                  data:
-                    type: array
-                    items: { $ref: '#/components/schemas/Message' }
+          description: '`{ count, data: [{ id, sender_id, sender_name, content, created_at }] }` (toi da 200 tin)'
     post:
       tags: [Cong dong - Ghep doi]
       summary: Gui tin nhan
       security:
         - BearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: integer }
+        - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
         content:
@@ -1453,17 +1555,10 @@ paths:
               type: object
               required: [content]
               properties:
-                content: { type: string }
+                content: { type: string, maxLength: 2000 }
       responses:
         '201':
-          description: Tin nhan da gui
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  data: { $ref: '#/components/schemas/Message' }
+          description: '`{ data: { id, sender_id, content, created_at } }`'
 
   /api/admin/venues/pending:
     get:
@@ -1508,38 +1603,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-
-  /api/admin/venues/{id}/approval-history:
-    get:
-      tags: [Quan tri - Duyet san]
-      summary: Lich su duyet cua mot cum san (SCRUM-119)
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/VenueId'
-      responses:
-        '200':
-          description: Lich su duyet
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count: { type: integer }
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id: { type: integer }
-                        action: { type: string, enum: [SUBMIT, APPROVE, REJECT, SUSPEND] }
-                        reason: { type: string, nullable: true }
-                        created_at: { type: string, format: date-time }
-                        admin_name: { type: string, nullable: true }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
 
   /api/admin/venues/{id}/approve:
     post:
@@ -1618,42 +1681,6 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           $ref: '#/components/responses/NotFound'
-
-  /api/admin/venues/{id}/resubmit:
-    post:
-      tags: [Quan tri - Duyet san]
-      summary: Cho phep chu san tai gui ho so sau khi bi tu choi (SCRUM-119)
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/VenueId'
-      responses:
-        '200':
-          description: Cum san da duoc tai gui, quay ve trang thai PENDING
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  result:
-                    type: object
-                    properties:
-                      venue_id: { type: integer }
-                      status: { type: string, example: PENDING }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '400':
-          description: Cum san khong o trang thai REJECTED hoac DRAFT
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  # ===== Owner & User Management =====
 
   /api/owner/request:
     post:
@@ -1975,7 +2002,8 @@ paths:
       description: |
         Tao mot don `RECURRING` gom moi buoi trong `months` thang roi vao `weekdays`, o trang thai `HELD`.
         Chiet khau lay tu khuyen mai `CONTRACT_DISCOUNT` cua san, mac dinh 10% (1-2 thang) / 15% (>= 3 thang).
-        Neu co buoi da bi dat, tra `RECURRING_CONFLICT` kem danh sach ngay trong `details.dates`.
+        Neu co buoi da bi dat, tra `RECURRING_CONFLICT` kem `details.dates`, `details.sessions_total`, `details.sessions_available`.
+        Gui lai voi `skip_conflicts: true` de bo qua cac ngay trung, chi ky hop dong cac buoi con lai.
       security:
         - BearerAuth: []
       requestBody:
@@ -1993,6 +2021,7 @@ paths:
                 start:      { type: string, example: '19:00' }
                 end:        { type: string, example: '20:30' }
                 note:       { type: string }
+                skip_conflicts: { type: boolean, default: false }
       responses:
         '201':
           description: Tao hop dong thanh cong
@@ -2004,6 +2033,7 @@ paths:
                   - type: object
                     properties:
                       sessions_total:    { type: integer }
+                      skipped_dates:     { type: array, items: { type: string, format: date } }
                       contract_discount: { type: integer, description: Phan tram chiet khau }
         '409':
           description: '`RECURRING_CONFLICT` / `NO_PRICE_RULE`'
@@ -2101,7 +2131,7 @@ paths:
   /api/complaints:
     post:
       tags: [Khieu nai]
-      summary: Gui khieu nai ve mot don dat cua minh
+      summary: Gui khieu nai cho mot don cua minh
       security:
         - BearerAuth: []
       requestBody:
@@ -2112,22 +2142,60 @@ paths:
               type: object
               required: [booking_code, subject, content]
               properties:
-                booking_code: { type: string }
-                subject:      { type: string, maxLength: 200 }
-                content:      { type: string, maxLength: 2000 }
+                booking_code:  { type: string }
+                subject:       { type: string, maxLength: 200 }
+                content:       { type: string, maxLength: 2000 }
+                evidence_urls: { type: array, maxItems: 5, items: { type: string, format: uri } }
       responses:
         '201':
-          description: Da tao phieu khieu nai (status NEW)
+          description: '`{ id, code, status, subject, created_at }`'
 
   /api/complaints/me:
     get:
       tags: [Khieu nai]
-      summary: Khieu nai cua toi
+      summary: Khieu nai cua toi (kem han bo sung va tin nhan moi nhat cua admin)
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Danh sach phieu kem ket qua xu ly
+          description: Danh sach khieu nai
+
+  /api/complaints/{id}:
+    get:
+      tags: [Khieu nai]
+      summary: Chi tiet khieu nai cua toi kem trao doi voi admin va bang chung
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Ticket + `messages` + `evidence`
+        '403':
+          description: Khong phai nguoi gui
+
+  /api/complaints/{id}/messages:
+    post:
+      tags: [Khieu nai]
+      summary: Bo sung thong tin cho khieu nai
+      description: Ticket dang `NEED_INFO` chuyen ve `IN_PROGRESS` va bao cho admin phu trach. Ticket da dong -> `INVALID_STATUS`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:       { type: string, maxLength: 2000 }
+                evidence_urls: { type: array, maxItems: 5, items: { type: string, format: uri } }
+      responses:
+        '201':
+          description: Da gui
 
   /api/owner/venues:
     get:
@@ -2137,7 +2205,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: Danh sach cum san
+          description: Danh sach cum san kem `fields`, `amenities` (ma), thong tin ngan hang va `reject_reason` gan nhat
 
   /api/owner/bookings:
     get:
@@ -2284,9 +2352,14 @@ paths:
               required: [status]
               properties:
                 status: { type: string, enum: [ACTIVE, LOCKED] }
+                confirm: { type: boolean, default: false, description: Xac nhan khoa chu san con don chua dien ra }
       responses:
         '200':
-          description: Da cap nhat trang thai
+          description: '`{ message, user, cancelled_bookings }`'
+        '409':
+          description: |
+            `OWNER_HAS_UPCOMING_BOOKINGS` - chu san con `details.count` don chua dien ra.
+            Gui lai voi `confirm: true` de khoa, huy cac don do va thong bao cho nguoi dat.
 
   /api/admin/complaints:
     get:
@@ -2300,11 +2373,51 @@ paths:
         '200':
           description: Phieu kem don, san, nguoi khieu nai va so tien coc da thanh toan (`paid_amount`)
 
+  /api/admin/complaints/{id}:
+    get:
+      tags: [Quan tri - Khieu nai]
+      summary: Ho so khieu nai de xac minh
+      description: |
+        Kem don dat san + khung gio, giao dich coc, nhat ky chat cua tran, trao doi voi nguoi gui, bang chung,
+        danh sach nguoi lien quan (`parties`: nguoi dat, chu san, nguoi tham gia). Ticket `NEW` -> `IN_PROGRESS`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Ho so day du
+
+  /api/admin/complaints/{id}/request-info:
+    post:
+      tags: [Quan tri - Khieu nai]
+      summary: Yeu cau nguoi gui bo sung thong tin (han 24h)
+      description: Ticket -> `NEED_INFO`, `info_due_at = now + 24h`, gui thong bao. Qua han thi danh sach tra `info_overdue = true`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: '`{ id, code, status, info_due_at }`'
+
   /api/admin/complaints/{id}/resolve:
     post:
       tags: [Quan tri - Khieu nai]
-      summary: Xu ly khieu nai (hoan coc hoac tu choi)
-      description: '`REFUND` hoan 100% cac khoan coc SUCCESS, don chuyen REFUNDED va nha slot.'
+      summary: Ra phan quyet va dong khieu nai
+      description: |
+        `REFUND` hoan 100% coc da thu (don -> `REFUNDED`, nha slot); `REJECT` khong hoan.
+        Kem theo co the tru diem uy tin (`penalty_user_id`, `penalty_points` 1-50) va/hoac khoa tai khoan (`lock_user_id`);
+        chi ap dung cho nguoi lien quan toi don. Nguoi gui nhan thong bao ket qua.
       security:
         - BearerAuth: []
       parameters:
@@ -2317,43 +2430,810 @@ paths:
               type: object
               required: [outcome, resolution]
               properties:
-                outcome:    { type: string, enum: [REFUND, REJECT] }
-                resolution: { type: string }
+                outcome:         { type: string, enum: [REFUND, REJECT] }
+                resolution:      { type: string }
+                penalty_user_id: { type: integer }
+                penalty_points:  { type: integer, minimum: 1, maximum: 50 }
+                lock_user_id:    { type: integer }
       responses:
         '200':
-          description: Phieu da RESOLVED, kem `refunded_amount`
+          description: '`{ id, code, status, resolution, closed_at, refunded_amount }`'
 
   /api/admin/reports:
     get:
       tags: [Quan tri - Bao cao]
-      summary: Bao cao thang nay va ty le lap day theo khung gio (30 ngay)
+      summary: Bao cao toan he thong theo khoang ngay (toi da 366 ngay)
+      description: |
+        Mac dinh tu dau thang toi hom nay. Tra ve `summary` (luot dat, huy, doanh thu, tien coc, lap day),
+        `series` theo ngay (hoac theo thang khi > 62 ngay), `occupancy` theo khung gio, `top_venues`, `open_complaints`.
+        Qua 366 ngay -> `INVALID_TIME_RANGE`, dung `/export`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Bao cao
+
+  /api/admin/reports/export:
+    get:
+      tags: [Quan tri - Bao cao]
+      summary: Xuat bao cao CSV (mo bang Excel)
+      description: <= 366 ngay tra file ngay; dai hon tra 202 va xu ly nen, gui file qua email cua admin.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: File `text/csv` (UTF-8 BOM)
+        '202':
+          description: '`{ queued: true, email }` - bao cao se gui qua email'
+
+  /api/owner/reports:
+    get:
+      tags: [Chu san - Van hanh]
+      summary: Bao cao cum san theo Ngay / Tuan / Thang
+      description: Cung cau truc voi bao cao he thong, loc theo `venue_id`. Co the thay `period` bang `from` / `to`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: venue_id, in: query, required: true, schema: { type: integer } }
+        - { name: period, in: query, schema: { type: string, enum: [day, week, month], default: month } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Bao cao (`empty = true` khi chua co du lieu)
+
+  /api/payments/vnpay:
+    post:
+      tags: [Thanh toan]
+      summary: Tao giao dich VNPay cho tien coc
+      description: |
+        Don phai `HELD` va con han giu cho. Tra `payment_url` de chuyen trinh duyet sang VNPay; han giao dich = han giu cho.
+        Chua cau hinh `VNPAY_TMN_CODE` / `VNPAY_HASH_SECRET` (khong phai production) -> URL tro toi cong gia lap.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code]
+              properties:
+                booking_code: { type: string }
+      responses:
+        '201':
+          description: '`{ payment_url, txn_ref, mock }`'
+        '409':
+          description: '`INVALID_STATUS` / `HOLD_EXPIRED`'
+
+  /api/payments/vnpay/return:
+    get:
+      tags: [Thanh toan]
+      summary: VNPay chuyen trinh duyet ve
+      description: |
+        Kiem chu ky HMAC-SHA512 va so tien, ghi `payment_transaction` (chong xu ly trung), thanh cong thi don -> `CONFIRMED`
+        va bao cho nguoi dat + chu san. Redirect `FRONTEND_URL/thanh-toan/ket-qua?status=success|failed|late|invalid&code=`.
+
+  /api/payments/vnpay/ipn:
+    get:
+      tags: [Thanh toan]
+      summary: IPN server-to-server cua VNPay
+      description: Cung xu ly voi return URL. Tra `{ RspCode, Message }` theo dac ta VNPay (00, 01, 02, 04, 97, 99).
+
+  /api/payments/bank/config:
+    get:
+      tags: [Thanh toan]
+      summary: Che do doi soat chuyen khoan
+      responses:
+        '200':
+          description: '`{ auto_match: true, mock }` - `mock` = true khi chua cau hinh `BANK_WEBHOOK_API_KEY` (khong phai production)'
+
+  /api/payments/bank/webhook:
+    post:
+      tags: [Thanh toan]
+      summary: Webhook bien dong so du (dinh dang SePay)
+      description: |
+        Header `Authorization: Apikey <BANK_WEBHOOK_API_KEY>`. Chi xu ly `transferType = in`; goi lai cung `id` -> `duplicate`.
+        Boc ma don `BK......` tu noi dung chuyen khoan (bo qua dau cach, hoa thuong) roi khop:
+        - Du coc -> don `CONFIRMED`, slot khoa, payment `SUCCESS`, bao nguoi dat + chu san (`confirmed`)
+        - Thieu -> don giu `HELD`, gia han giu cho toi thieu 5 phut, bao so tien con thieu (`underpaid`)
+        - Khong co ma don / sai tai khoan nhan / don da xac nhan tu truoc -> hang doi doi soat thu cong (`unmatched`)
+        - Don het han: slot con trong thi giu lai don va xac nhan; da co nguoi dat de hoac don da huy -> cho hoan (`refund_pending`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, transferType, transferAmount]
+              properties:
+                id:              { type: integer, description: Ma giao dich ben SePay }
+                gateway:         { type: string, example: Vietcombank }
+                transactionDate: { type: string, example: '2026-10-27 22:00:00' }
+                accountNumber:   { type: string }
+                content:         { type: string, example: 'SANBONG BK261027ABCDE' }
+                transferType:    { type: string, enum: [in, out] }
+                transferAmount:  { type: number }
+                referenceCode:   { type: string }
+      responses:
+        '200':
+          description: '`{ success: true, result: confirmed | underpaid | unmatched | refund_pending | duplicate | ignored, booking_code?, transaction_id? }`'
+        '401':
+          description: '`BANK_WEBHOOK_UNAUTHORIZED`'
+
+  /api/payments/bank/mock-transfer:
+    post:
+      tags: [Thanh toan]
+      summary: Gia lap ngan hang bao co (chi moi truong phat trien)
+      description: Chi bat khi chua cau hinh webhook. Nguoi dat (hoac admin) gui thu; xu ly giong webhook that.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code]
+              properties:
+                booking_code: { type: string }
+                amount:       { type: number, description: Mac dinh = tien coc }
+                content:      { type: string, description: 'Mac dinh `SANBONG <ma don>`; nhan ca QUY / NAP / GIAI de test quy doi, nap vi, le phi giai' }
+      responses:
+        '201':
+          description: Ket qua khop lenh, giong webhook
+        '404':
+          description: '`ROUTE_NOT_FOUND` khi da cau hinh webhook that'
+
+  /api/payments/bank/transactions:
+    get:
+      tags: [Thanh toan]
+      summary: Hang doi doi soat chuyen khoan
+      description: |
+        OWNER thay giao dich vao so tai khoan cua cum san minh (hoac da gan voi don cua cum san minh); ADMIN thay tat ca.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: 'Danh sach cach nhau dau phay. Mac dinh `UNMATCHED,REFUND_PENDING`'
+          schema: { type: string, example: 'UNMATCHED' }
+      responses:
+        '200':
+          description: '`{ count, data: [{ id, amount, content, account_number, bank_name, status, note, received_at, booking_code, booking_status, venue_name, customer_name }] }`'
+
+  /api/payments/bank/transactions/{id}/assign:
+    post:
+      tags: [Thanh toan]
+      summary: Gan tay giao dich khong khop vao don
+      description: 'Giao dich phai `UNMATCHED`; don phai thuoc cum san cua chu san (admin moi don) va chua xac nhan coc.'
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_code]
+              properties:
+                booking_code: { type: string }
+      responses:
+        '200':
+          description: '`{ result: confirmed | underpaid | refund_pending, booking_code }`'
+        '404':
+          description: '`TRANSACTION_NOT_FOUND` / `BOOKING_NOT_FOUND`'
+        '409':
+          description: '`TRANSACTION_ALREADY_HANDLED` / `INVALID_STATUS`'
+
+  /api/payments/bank/transactions/{id}/resolve:
+    post:
+      tags: [Thanh toan]
+      summary: Danh dau da hoan tien / ghi nhan
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [REFUNDED, IGNORED] }
+                note:   { type: string, maxLength: 300 }
+      responses:
+        '200':
+          description: '`{ id, status, note, handled_at }`'
+        '409':
+          description: '`TRANSACTION_ALREADY_HANDLED`'
+
+  /api/owner/venues/{id}/services:
+    get:
+      tags: [Chu san - Dich vu]
+      summary: Menu va ton kho (ca mon da an)
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "`{ count, data: [{ id, name, price, category, stock, is_active }] }`"
+
+    post:
+      tags: [Chu san - Dich vu]
+      summary: Them mat hang
+      description: |
+        category DRINK | RENTAL | BALL | REFEREE | OTHER; stock null = khong quan kho.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                price: { type: number }
+                category: { type: string }
+                stock: { type: integer, nullable: true }
+      responses:
+        '201':
+          description: "Mat hang moi"
+
+  /api/owner/services/{id}:
+    put:
+      tags: [Chu san - Dich vu]
+      summary: Sua mat hang, ton kho, an / hien
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                price: { type: number }
+                category: { type: string }
+                stock: { type: integer, nullable: true }
+                is_active: { type: boolean }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/owner/venues/{id}/pos:
+    get:
+      tags: [Chu san - Dich vu]
+      summary: Man POS - o san trong ngay, menu, don quay trong ngay
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: "`{ bookings, services, orders }`"
+
+  /api/owner/venues/{id}/pos-orders:
+    post:
+      tags: [Chu san - Dich vu]
+      summary: Ban tai quay
+      description: |
+        Tru kho ngay, het hang -> 409 `OUT_OF_STOCK`. `ADD_TO_BOOKING` can `booking_code`, thu khi check-out.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items: { type: array, items: { type: object, properties: { service_id: { type: integer }, quantity: { type: integer } } } }
+                pay_mode: { type: string, enum: [CASH, QR, ADD_TO_BOOKING] }
+                booking_code: { type: string }
+      responses:
+        '201':
+          description: "Don quay"
+
+  /api/owner/bookings/{code}/checkout:
+    get:
+      tags: [Chu san - Dich vu]
+      summary: Tien con thu va do cho thue can kiem
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "`{ items, rentals, field_remaining, unpaid_services, amount_due, checked_out_at }`"
+
+    post:
+      tags: [Chu san - Dich vu]
+      summary: Hoan tat don / check-out
+      description: |
+        Don co do cho thue bat buoc gui `rentals_returned` (khong gui -> 409 `RENTAL_CHECK_REQUIRED`). Tra du -> cong lai kho.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rentals_returned: { type: boolean }
+                missing_note: { type: string }
+      responses:
+        '200':
+          description: "`{ code, checked_out, amount_collected }`"
+
+  /api/splits/mine:
+    get:
+      tags: [So quy doi bong]
+      summary: Cac khoan minh con phai dong
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Bao cao
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  month:
-                    type: object
-                    properties:
-                      bookings:        { type: integer }
-                      cancelled:       { type: integer }
-                      gmv:             { type: number }
-                      matched_posts:   { type: integer }
-                      open_complaints: { type: integer }
-                  occupancy:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        label:            { type: string, example: '17:30 - 21:00' }
-                        used_minutes:     { type: integer }
-                        capacity_minutes: { type: integer }
-                        rate:             { type: number, description: Phan tram }
+          description: "`{ count, data: [{ id, amount, booking_code, venue_name, due_at, starts_at, captain_name }] }`"
+
+  /api/splits/booking/{code}:
+    get:
+      tags: [So quy doi bong]
+      summary: So quy tran
+      description: |
+        Doi truong, thanh vien trong danh sach chia va nguoi tham gia tran xem duoc.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "`{ booking, is_captain, my_phone, bill | null }`"
+
+    post:
+      tags: [So quy doi bong]
+      summary: Doi truong chia tien tran
+      description: |
+        Chi tran da xac nhan, moi tran mot lan (409 `SPLIT_EXISTS`). EQUAL / SPONSOR lam tron LEN hang nghin, tien thua vao quy doi khi ca doi dong du; CUSTOM phai khop tong chi phi (400 `SPLIT_AMOUNT_MISMATCH`). Noi dung chuyen khoan cua thanh vien `QUY <ma tran> <SDT>`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode: { type: string, enum: [EQUAL, SPONSOR, CUSTOM] }
+                sponsor_percent: { type: integer }
+                members: { type: array, items: { type: object, properties: { name: { type: string }, phone: { type: string }, amount: { type: number } } } }
+                due_hours_before: { type: number }
+                bank_name: { type: string }
+                bank_account: { type: string }
+                bank_holder: { type: string }
+      responses:
+        '201':
+          description: "So quy"
+
+  /api/splits/booking/{code}/candidates:
+    get:
+      tags: [So quy doi bong]
+      summary: Thanh vien doi, chan le da ghep, tong chi phi
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "`{ total, field_and_online_services, pos_services, members, last_bank }`"
+
+  /api/splits/shares/{id}/mark-paid:
+    post:
+      tags: [So quy doi bong]
+      summary: Doi truong xac nhan da thu
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/splits/shares/{id}/pay-for:
+    post:
+      tags: [So quy doi bong]
+      summary: Doi truong dong thay
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/splits/shares/{id}/reassign:
+    post:
+      tags: [So quy doi bong]
+      summary: Doi nguoi dong
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+      responses:
+        '201':
+          description: "Phan moi"
+
+  /api/wallets/venues/{venueId}/plans:
+    get:
+      tags: [Vi hoi vien]
+      summary: Goi dang ban cua cum san
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/wallets/venues/{venueId}/me:
+    get:
+      tags: [Vi hoi vien]
+      summary: Vi cua toi tai cum san
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "`{ wallet | null }`"
+
+  /api/wallets/mine:
+    get:
+      tags: [Vi hoi vien]
+      summary: Moi vi cua toi va giao dich gan day
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "OK"
+
+  /api/wallets/topups:
+    post:
+      tags: [Vi hoi vien]
+      summary: Mua goi - tra thong tin VietQR, noi dung `NAP <ma>`
+      description: |
+        Tien ve du -> cong vi (nap + tang), nang hang goi neu giam gia cao hon.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan_id: { type: integer }
+      responses:
+        '201':
+          description: "`{ topup, plan, transfer }`"
+
+  /api/wallets/topups/{code}:
+    get:
+      tags: [Vi hoi vien]
+      summary: Trang thai lenh nap
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/wallets/pay:
+    post:
+      tags: [Vi hoi vien]
+      summary: Tra coc bang vi hoi vien
+      description: |
+        Don HELD con han. Ap % giam cua goi len tien san (giu ti le coc), tru vi; thieu -> `partial`, phan con lai chuyen VietQR. Don het han / bi huy -> job hoan lai vi. 409 `WALLET_EMPTY` / `WALLET_FROZEN`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking_code: { type: string }
+      responses:
+        '200':
+          description: "`{ result: confirmed | partial, discount, paid_from_wallet, remaining, deposit }`"
+
+  /api/wallets/owner/venues/{id}/plans:
+    get:
+      tags: [Vi hoi vien]
+      summary: Chu san - goi, so vi, tong so du
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+    post:
+      tags: [Vi hoi vien]
+      summary: Chu san - tao goi
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                price: { type: number }
+                bonus: { type: number }
+                discount_percent: { type: integer, maximum: 50 }
+      responses:
+        '201':
+          description: "Goi moi"
+
+  /api/wallets/owner/plans/{id}:
+    put:
+      tags: [Vi hoi vien]
+      summary: Chu san - sua / ngung ban goi
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                price: { type: number }
+                bonus: { type: number }
+                discount_percent: { type: integer }
+                is_active: { type: boolean }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/wallets/admin/frozen:
+    get:
+      tags: [Vi hoi vien]
+      summary: Admin - vi bi dong bang con so du
+      description: |
+        Khoa chu san -> vi cua cac cum san do con tien bi FROZEN va bao admin.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "`{ count, total, data }`"
+
+  /api/wallets/admin/{id}/refund:
+    post:
+      tags: [Vi hoi vien]
+      summary: Admin - da hoan so du cho nguoi choi, vi ve 0
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/leaderboard:
+    get:
+      tags: [Giai dau & Xep hang]
+      summary: Bang xep hang doi
+      parameters:
+        - { name: district, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [elo, wins, streak, reputation] } }
+      responses:
+        '200':
+          description: "`{ count, sort, data: [{ rank, id, name, elo, wins, draws, losses, win_streak, reputation_score, district_name }] }`"
+
+  /api/matches/results/mine:
+    get:
+      tags: [Giai dau & Xep hang]
+      summary: Tran cap keo cua doi minh (can / da nhap ty so)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "OK"
+
+  /api/matches/{code}/result:
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: Doi truong nhap ty so tran cap keo
+      description: |
+        Hai doi khop -> CONFIRMED, tinh Elo (K = 32 x he so uy tin). Lech -> DISPUTED, 12 tieng de sua; qua han job chuyen VOID, khong tinh Elo.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                home_score: { type: integer }
+                away_score: { type: integer }
+      responses:
+        '200':
+          description: "`{ status: PENDING | CONFIRMED | DISPUTED, result }`"
+
+  /api/tournaments:
+    get:
+      tags: [Giai dau & Xep hang]
+      summary: Danh sach giai
+      parameters:
+        - { name: status, in: query, schema: { type: string, example: 'OPEN,ONGOING' } }
+        - { name: mine, in: query, description: Giai minh to chuc (can token), schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: Chu san tao giai
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                venue_id: { type: integer }
+                field_id: { type: integer }
+                name: { type: string }
+                description: { type: string }
+                format: { type: string, enum: [ROUND_ROBIN, KNOCKOUT] }
+                max_teams: { type: integer }
+                fee: { type: number }
+                registration_deadline: { type: string, format: date-time }
+                start_date: { type: string, format: date }
+                daily_start: { type: string, example: '17:00' }
+                daily_end: { type: string, example: '22:00' }
+                match_minutes: { type: integer, enum: [60, 90, 120] }
+      responses:
+        '201':
+          description: "`{ id }`"
+
+  /api/tournaments/{id}:
+    get:
+      tags: [Giai dau & Xep hang]
+      summary: Chi tiet giai - doi, lich, bang xep hang, dang ky cua doi minh
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/tournaments/{id}/register:
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: Doi truong dang ky giai
+      description: |
+        Co le phi -> PENDING_PAYMENT va noi dung `GIAI <ma>`; tien ve thi REGISTERED. 409 `TOURNAMENT_BANNED` / `TOURNAMENT_FULL`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '201':
+          description: "`{ status, fee_code, transfer }`"
+
+  /api/tournaments/{id}/schedule:
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: BTC chia bang va xep lich
+      description: |
+        Vong tron: hon 5 doi thi chia bang toi da 4 doi. Loai truc tiep: boc tham; goi lai de xep vong sau / chot vo dich. Moi tran giu mot slot (booking OWNER_LOCK) vao khung gio trong cua san.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/tournaments/matches/{id}/result:
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: BTC nhap ket qua tran trong giai
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                home_score: { type: integer }
+                away_score: { type: integer }
+      responses:
+        '200':
+          description: "OK"
+
+  /api/tournaments/matches/{id}/forfeit:
+    post:
+      tags: [Giai dau & Xep hang]
+      summary: Doi bo tran
+      description: |
+        Xu thua 0-3, tru 20 diem uy tin doi, cam dang ky giai 30 ngay, nha slot san. BTC ghi nhan thay thi gui `team_id`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                team_id: { type: integer }
+      responses:
+        '200':
+          description: "OK"
 
 components:
   securitySchemes:
@@ -2467,14 +3347,42 @@ components:
             requestId: { type: string, description: Trung voi header X-Request-Id }
             timestamp: { type: string, format: date-time }
 
+    VenueInput:
+      type: object
+      description: Khi tao bat buoc name, address, district_code, phone; khi sua chi gui truong can doi
+      properties:
+        name:          { type: string, maxLength: 150 }
+        address:       { type: string, maxLength: 300 }
+        district_code: { type: string }
+        phone:         { type: string, example: '0912345678' }
+        latitude:      { type: number, nullable: true }
+        longitude:     { type: number, nullable: true }
+        description:   { type: string }
+        open_time:     { type: string, example: '06:00' }
+        close_time:    { type: string, example: '23:00' }
+        deposit_rate:  { type: number, minimum: 0, maximum: 1, example: 0.3 }
+        bank_name:     { type: string }
+        bank_account:  { type: string, description: 6-20 chu so }
+        bank_holder:   { type: string }
+        amenities:     { type: array, items: { type: string }, example: [LIGHT, WIFI] }
+        fields:
+          type: array
+          description: Chi khi tao - danh sach san con
+          items:
+            type: object
+            properties:
+              name: { type: string, maxLength: 50 }
+              type: { type: string, enum: [F5, F7, F11] }
+
     RegisterRequest:
       type: object
-      required: [phone, password, full_name]
+      required: [phone_number, password, full_name]
       properties:
-        phone:         { type: string, example: '0912345678', description: '10 so, bat dau bang 0' }
-        password:      { type: string, format: password, example: matkhau123, description: Toi thieu 6 ky tu }
+        phone_number:  { type: string, example: '0912345678', description: '10 so, dau so di dong VN (03/05/07/08/09)' }
+        password:      { type: string, format: password, example: matkhau123, description: 'Toi thieu 8 ky tu, gom ca chu va so' }
         full_name:     { type: string, example: Nguyen Van A }
         district_code: { type: string, example: CG }
+        role:          { type: string, enum: [PLAYER, OWNER], default: PLAYER }
 
     LoginRequest:
       type: object
@@ -2525,10 +3433,59 @@ components:
         deposit_rate:  { type: number, format: float, example: 0.3 }
         field_count:   { type: integer, example: 6 }
         min_price:     { type: integer, description: Gia thap nhat moi gio, dong, example: 250000 }
+        owner_id:      { type: integer }
+        latitude:      { type: number, nullable: true }
+        longitude:     { type: number, nullable: true }
         amenities:
           type: array
-          items: { type: string }
-          example: [Den, Cang tin]
+          items:
+            type: object
+            properties:
+              code: { type: string, example: PARKING }
+              name: { type: string, example: Bai xe }
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              id:        { type: integer }
+              venue_id:  { type: integer }
+              name:      { type: string }
+              type:      { type: string, enum: [F5, F7, F11] }
+              is_active: { type: boolean }
+        price_rules:
+          type: array
+          description: Cung dang voi `price_rules` cua `/api/venues/{id}`
+          items: { type: object }
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              id:    { type: integer }
+              name:  { type: string }
+              price: { type: number }
+        flash_sale:
+          type: object
+          nullable: true
+          description: Flash Sale dang hieu luc co muc giam cao nhat
+        contract_discounts:
+          type: array
+          items:
+            type: object
+            properties:
+              discount_percent:    { type: integer }
+              min_contract_months: { type: integer, nullable: true }
+        schedule:
+          type: array
+          description: Slot da kin trong ngay `date`
+          items:
+            type: object
+            properties:
+              field_id:    { type: integer }
+              start_at:    { type: string, format: date-time }
+              end_at:      { type: string, format: date-time }
+              slot_status: { type: string, enum: [HELD, CONFIRMED, LOCKED] }
 
     PricingRule:
       type: object
@@ -2694,6 +3651,12 @@ components:
         - type: object
           properties:
             venue_name: { type: string }
+            amount_received:
+              type: number
+              description: Tong tien chuyen khoan da tu khop vao don (bank_transaction PARTIAL + APPLIED)
+            refund_pending_amount:
+              type: number
+              description: Tien ve khi don da het han / bi huy, dang cho hoan
             payments:
               type: array
               items:

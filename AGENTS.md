@@ -4,6 +4,7 @@ Hướng dẫn cho mọi AI coding agent (Claude Code, Codex, Cursor, Copilot...
 
 Quy ước dự án (tech stack, cách chạy, Git flow, commit, lỗi API, migration, design system) nằm trong
 [`CLAUDE.md`](CLAUDE.md) - đọc trước khi sửa code.
+Kiến trúc tổng thể và các quy tắc thiết kế bắt buộc: [`docs/design/system-design.md`](docs/design/system-design.md).
 
 ## Skills
 

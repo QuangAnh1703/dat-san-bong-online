@@ -59,7 +59,7 @@ Kiến trúc 3 lớp độc lập: Frontend (React), Backend (Express), Database
 ├── csdl/                        Database
 │   ├── docker-compose.yml       PostgreSQL 16 + Redis 7 + Adminer
 │   └── db/
-│       ├── migration/           V01..V15 (SQL)
+│       ├── migration/           V01..V24 (SQL)
 │       └── all_in_one.sql
 │
 ├── docs/
@@ -162,7 +162,9 @@ Danh sách error code: `backend/src/lib/errors.js`
 | WF-01 | Trang chủ | `/` (role player) | `pages/HomePage.jsx` | ✅ Có |
 | WF-02 | Tìm kiếm & bộ lọc | Section `#search-pitches` trên trang chủ | `HomePage` + `SearchBar` | 🟡 Chưa có route `/tim-san` riêng |
 | WF-03 | Chi tiết sân & lịch trống | `/san/:id` | `pages/VenueDetailPage.jsx` | ✅ Có |
-| WF-04 | Thanh toán tiền cọc | Hiển thị ngay sau khi giữ chỗ | `components/PaymentPanel.jsx` | 🟡 Chưa có route `/thanh-toan/:code` |
+| WF-04 | Thanh toán tiền cọc (VNPay hoặc chuyển khoản VietQR) | Hiển thị ngay sau khi giữ chỗ; kết quả VNPay `/thanh-toan/ket-qua` | `components/PaymentPanel.jsx`, `pages/PaymentResultPage.jsx` | ✅ Có |
+| — | Tin nhắn (nhóm chat trận đã chốt kèo / ghép chân lẻ) | `/tin-nhan`, `/tin-nhan/:id` (cần đăng nhập) | `pages/MessagesPage.jsx` | ✅ Có |
+| — | Khiếu nại của tôi (theo dõi, bổ sung thông tin) | `/khieu-nai` (cần đăng nhập) | `pages/ComplaintsPage.jsx` | ✅ Có |
 | WF-05 | Đặt sân định kỳ | `/dat-dinh-ky` | `pages/SubscriptionPage.jsx` | ✅ Có |
 | WF-06 | Lịch đã đặt & đánh giá | `/lich-cua-toi` (cần đăng nhập) | `pages/MyBookingsPage.jsx` | ✅ Tab Sắp đá / Đã đá / Đã hủy, đánh giá sau trận |
 | WF-07 | Cáp kèo & tìm đối giao hữu | `/giao-huu`, đăng tin `/giao-huu/dang-tin` | `pages/MatchmakingPage.jsx`, `pages/ChallengePostPage.jsx` | ✅ Có |
@@ -170,7 +172,14 @@ Danh sách error code: `backend/src/lib/errors.js`
 | WF-08 | Ghép chân lẻ | `/ghep-chan-le?tab=doi-tim-nguoi\|nguoi-tim-doi\|cua-toi`, đăng tuyển `/ghep-chan-le/dang-tuyen`, tìm đội `/ghep-chan-le/dang-tin` | `pages/FreelancePage.jsx`, `pages/RecruitPostPage.jsx`, `pages/PlayerPostPage.jsx` (API `/api/freelance`) | ✅ Có |
 | WF-09 | Hồ sơ & điểm uy tín | `/ho-so` (cần đăng nhập) | `pages/ProfilePage.jsx` | ✅ Có |
 | WF-10 | Dashboard chủ sân | `/` khi role = owner | `pages/OwnerDashboard.jsx` | ✅ Có |
-| — | Admin: tổng quan / người dùng / duyệt chủ sân / cụm sân / khiếu nại / báo cáo | `/` khi role = admin, `/quan-tri/nguoi-dung`, `/quan-tri/chu-san`, `/quan-tri/cum-san`, `/quan-tri/khieu-nai`, `/quan-tri/bao-cao` | `pages/AdminDashboard.jsx`, `pages/Admin*Page.jsx` | ✅ Có |
+| — | Chủ sân: đơn đặt / lịch sân / bảng giá / cụm sân (đăng ký, sửa, gửi duyệt lại) | `/chu-san/don-dat`, `/chu-san/lich`, `/chu-san/bang-gia`, `/chu-san/cum-san`, `/chu-san/cum-san/moi`, `/chu-san/cum-san/:id` | `pages/Owner*Page.jsx`, `pages/OwnerVenueFormPage.jsx` | ✅ Có |
+| — | Đối soát chuyển khoản VietQR (giao dịch không tự khớp, chờ hoàn tiền) | `/chu-san/doi-soat`, `/quan-tri/doi-soat` | `pages/ReconciliationPage.jsx` (API `/api/payments/bank`) | ✅ Có |
+| — | Sổ quỹ & chia tiền trận | `/chia-tien/:code` (cần đăng nhập) | `pages/SplitBillPage.jsx` (API `/api/splits`) | ✅ Có |
+| — | Bảng xếp hạng Elo & giải đấu | `/bang-xep-hang?tab=giai-dau`, `/giai-dau/:id` | `pages/LeaderboardPage.jsx`, `pages/TournamentDetailPage.jsx` (API `/api/leaderboard`, `/api/tournaments`) | ✅ Có |
+| — | Chủ sân: căng-tin POS & kho / gói thành viên / giải đấu | `/chu-san/dich-vu`, `/chu-san/goi-thanh-vien`, `/chu-san/giai-dau` | `pages/OwnerServicesPage.jsx`, `pages/OwnerMembershipPage.jsx`, `pages/OwnerTournamentsPage.jsx` | ✅ Có |
+| — | Admin: ví hội viên đóng băng | `/quan-tri/vi-hoi-vien` | `pages/AdminWalletsPage.jsx` | ✅ Có |
+| — | Đăng nhập Google (nhận token từ backend) | `/auth/google-callback` | `pages/GoogleCallbackPage.jsx` | ✅ Có |
+| — | Admin: tổng quan / người dùng / duyệt chủ sân / cụm sân / khiếu nại / báo cáo | `/` khi role = admin, `/quan-tri/nguoi-dung`, `/quan-tri/chu-san`, `/quan-tri/cum-san`, `/quan-tri/khieu-nai`, `/quan-tri/khieu-nai/:id`, `/quan-tri/bao-cao` | `pages/AdminDashboard.jsx`, `pages/Admin*Page.jsx` | ✅ Có |
 
 Route `/` hiển thị theo vai trò của tài khoản (`role` trong `AppContext` = `user.role`). Ba vai trò tách biệt hoàn toàn: không có menu chuyển góc nhìn, trang của vai trò khác bị chặn (`RequireOwner`, `RequireAdmin` trong `App.jsx`).
 
@@ -239,6 +248,8 @@ Skill của dự án nằm trong `.claude/skills/` (Claude Code tự nạp; agen
 
 ## Quick Links
 
+- **Thiết kế hệ thống (kiến trúc, CSDL, phân quyền, job nền, quy tắc thiết kế):** `docs/design/system-design.md` — đọc trước khi thêm module / bảng / vai trò
+- **Luồng nghiệp vụ (từ PRD):** `docs/design/flows.md`
 - **API Docs (interactive):** `http://localhost:3000/docs` (khi backend chạy)
 - **OpenAPI Spec:** `docs/openapi.yaml`
 - **Error Codes:** `backend/src/lib/errors.js`
