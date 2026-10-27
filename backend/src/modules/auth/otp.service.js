@@ -9,7 +9,7 @@ const LOCKOUT_DURATION = 15 * 60; // 15 minutes
 
 /** Generate 6-digit OTP */
 function generateOtp() {
-  return String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
 
 /** Hash OTP for storage */

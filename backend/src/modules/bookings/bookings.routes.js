@@ -3,7 +3,9 @@ const express = require('express');
 const { query, withTransaction } = require('../../db');
 const { AppError, requireFields } = require('../../lib/errors');
 const { requireAuthenticated } = require('../../middlewares/auth');
+const { requireRole } = require('../../middlewares/rbac');
 const { quoteSlot } = require('../../services/pricing.service');
+const { takeStock } = require('../../services/inventory.service');
 const router = express.Router();
 
 const HOLD_MINUTES = Number(process.env.HOLD_MINUTES || 15);
@@ -47,7 +49,7 @@ async function loadSlots(bookingId) {
 
 async function loadServices(bookingId) {
   const r = await query(
-    `SELECT service_id, name, price FROM booking_service WHERE booking_id = $1 ORDER BY name`,
+    `SELECT service_id, name, price, quantity FROM booking_service WHERE booking_id = $1 ORDER BY name`,
     [bookingId]
   );
   return r.rows;
@@ -66,6 +68,19 @@ async function loadField(c, fieldId) {
     throw new AppError('VENUE_NOT_APPROVED', { details: { venue_id: field.venue_id } });
   }
   return field;
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Gio bat dau phai con o tuong lai: UI da disable slot qua han, nhung van chan neu goi thang API
+async function assertSlotTimes(c, playDate, start, end) {
+  if (!DATE_RE.test(String(playDate))) throw new AppError('INVALID_FIELD', { details: { field: 'play_date' } });
+  if (!TIME_RE.test(String(start)) || !TIME_RE.test(String(end)) || toMinutes(end) <= toMinutes(start)) {
+    throw new AppError('INVALID_TIME_RANGE', { details: { start, end } });
+  }
+  const r = await c.query(`SELECT ($1 || ' ' || $2)::timestamptz <= now() AS past`, [playDate, start]);
+  if (r.rows[0].past) throw new AppError('SLOT_IN_PAST', { details: { play_date: playDate, start } });
 }
 
 async function insertSlot(c, { bookingId, fieldId, playDate, start, end, price, status, quote }) {
@@ -89,23 +104,18 @@ async function insertSlot(c, { bookingId, fieldId, playDate, start, end, price, 
 }
 
 // GET /api/bookings - Lay danh sach booking cua user hien tai
-router.get('/', async (req, res, next) => {
+router.get('/', requireAuthenticated, async (req, res, next) => {
   try {
-    // Cho phep truy van khong co authentication neu co user_id trong query
-    let userId = req.query.user_id;
-    if (!userId && req.user) {
-      userId = req.user.id;
-    }
-
-    if (!userId) {
-      return res.json({ count: 0, data: [] });
-    }
+    // Chi admin duoc xem don cua nguoi khac (ket qua co SDT)
+    const userId = req.user.role === 'ADMIN' && req.query.user_id ? Number(req.query.user_id) : req.user.id;
 
     // Gom ca tran minh duoc chap nhan qua cap keo / ghep chan le (match_participant), khong chi don minh dat
     const result = await query(
       `SELECT b.*, v.name AS venue_name, t.name AS team_name,
               rc.weekdays, rc.start_date, rc.end_date, rc.sessions_total, rc.discount_percent AS contract_discount,
               EXISTS (SELECT 1 FROM complaint_ticket ct WHERE ct.booking_id = b.id) AS has_complaint,
+              (SELECT c.id FROM conversation c JOIN conversation_member cm ON cm.conversation_id = c.id
+                WHERE c.booking_id = b.id AND cm.user_id = $1) AS conversation_id,
               (b.user_id IS DISTINCT FROM $1) AS is_participant,
               COALESCE(hp.full_name, b.guest_name) AS host_name,
               v.address AS venue_address,
@@ -143,9 +153,9 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/bookings
-// body: { field_id, play_date, start, end, user_id?, guest_name?, guest_phone?, note?,
-//         service_ids?, pay_full?, looking_for_rival?, deal_note? }
-router.post('/', async (req, res, next) => {
+// body: { field_id, play_date, start, end, guest_name?, guest_phone?, note?,
+//         service_ids? | services?: [{ id, quantity }], pay_full?, looking_for_rival?, deal_note? }
+router.post('/', requireAuthenticated, async (req, res, next) => {
   const {
     field_id,
     play_date,
@@ -155,20 +165,21 @@ router.post('/', async (req, res, next) => {
     guest_phone,
     note,
     service_ids = [],
+    services: serviceItems,
     pay_full = false,
     looking_for_rival = false,
     deal_note,
   } = req.body || {};
-  const userId = req.user?.id || req.body?.user_id;
+  const userId = req.user.id;
 
   try {
-    // Rang buoc ck_booking_owner: don bat buoc co user_id.
-    requireFields({ ...req.body, user_id: userId }, ['field_id', 'play_date', 'start', 'end', 'user_id']);
-    if (!Array.isArray(service_ids)) {
+    requireFields(req.body, ['field_id', 'play_date', 'start', 'end']);
+    if (!Array.isArray(service_ids) || (serviceItems !== undefined && !Array.isArray(serviceItems))) {
       throw new AppError('INVALID_FIELD', { details: { field: 'service_ids', reason: 'Must be array' } });
     }
 
     const out = await withTransaction(async (c) => {
+      await assertSlotTimes(c, play_date, start, end);
       const field = await loadField(c, field_id);
       const quote = await quoteSlot(c, {
         venueId: field.venue_id,
@@ -178,20 +189,19 @@ router.post('/', async (req, res, next) => {
         end,
       });
 
-      // Dich vu cong them: lay gia tu CSDL, khong tin gia client gui len
-      const services = service_ids.length
-        ? (
-            await c.query(
-              `SELECT id, name, price FROM venue_service
-              WHERE venue_id = $1 AND is_active AND id = ANY($2::bigint[])`,
-              [field.venue_id, service_ids.map(Number)]
-            )
-          ).rows
-        : [];
-      const servicesTotal = services.reduce((s, x) => s + Number(x.price), 0);
+      // Dich vu cong them: lay gia tu CSDL, khong tin gia client gui len; tru kho ngay (PRD 2.2.5)
+      const wanted = serviceItems || service_ids.map((id) => ({ id, quantity: 1 }));
+      const services = await takeStock(c, field.venue_id, wanted);
+      const servicesTotal = services.reduce((s, x) => s + Number(x.price) * x.quantity, 0);
 
       let team = null;
       if (looking_for_rival) {
+        // PRD 1.5: phai con it nhat 30 phut truoc gio da moi tim doi giao huu
+        const soon = await c.query(`SELECT ($1 || ' ' || $2)::timestamptz < now() + interval '30 minutes' AS soon`, [
+          play_date,
+          start,
+        ]);
+        if (soon.rows[0].soon) throw new AppError('MATCH_TOO_SOON');
         const t = await c.query(`SELECT id, skill_level FROM team WHERE captain_id = $1`, [userId]);
         if (t.rowCount === 0) throw new AppError('TEAM_REQUIRED');
         team = t.rows[0];
@@ -237,8 +247,9 @@ router.post('/', async (req, res, next) => {
 
       for (const s of services) {
         await c.query(
-          `INSERT INTO booking_service (booking_id, service_id, name, price) VALUES ($1, $2, $3, $4)`,
-          [booking.id, s.id, s.name, s.price]
+          `INSERT INTO booking_service (booking_id, service_id, name, price, quantity) VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (booking_id, service_id) DO UPDATE SET quantity = booking_service.quantity + EXCLUDED.quantity`,
+          [booking.id, s.id, s.name, s.price, s.quantity]
         );
       }
 
@@ -287,9 +298,10 @@ router.post('/', async (req, res, next) => {
 });
 
 // POST /api/bookings/recurring - Dat san dinh ky (UC-05)
-// body: { field_id, weekdays: [1..7] (ISO, 1 = Thu 2), start_date, months, start, end, note? }
+// body: { field_id, weekdays: [1..7] (ISO, 1 = Thu 2), start_date, months, start, end, note?, skip_conflicts? }
+// skip_conflicts = true: bo qua cac buoi da co nguoi dat, chi ky hop dong cac buoi con lai
 router.post('/recurring', requireAuthenticated, async (req, res, next) => {
-  const { field_id, weekdays, start_date, months, start, end, note } = req.body || {};
+  const { field_id, weekdays, start_date, months, start, end, note, skip_conflicts = false } = req.body || {};
 
   try {
     requireFields(req.body, ['field_id', 'weekdays', 'start_date', 'months', 'start', 'end']);
@@ -309,7 +321,7 @@ router.post('/recurring', requireAuthenticated, async (req, res, next) => {
     }
     const last = new Date(first);
     last.setUTCMonth(last.getUTCMonth() + monthCount);
-    const dates = [];
+    let dates = [];
     for (let d = new Date(first); d < last; d.setUTCDate(d.getUTCDate() + 1)) {
       const iso = ((d.getUTCDay() + 6) % 7) + 1;
       if (days.includes(iso)) dates.push(d.toISOString().slice(0, 10));
@@ -317,6 +329,7 @@ router.post('/recurring', requireAuthenticated, async (req, res, next) => {
     if (dates.length === 0) throw new AppError('INVALID_FIELD', { details: { field: 'weekdays' } });
 
     const out = await withTransaction(async (c) => {
+      await assertSlotTimes(c, dates[0], start, end);
       const field = await loadField(c, field_id);
 
       // Bao truoc tat ca cac buoi bi trung de nguoi dung doi lich mot lan
@@ -329,7 +342,13 @@ router.post('/recurring', requireAuthenticated, async (req, res, next) => {
         );
         if (!a.rows[0].ok) conflicts.push(d);
       }
-      if (conflicts.length) throw new AppError('RECURRING_CONFLICT', { details: { dates: conflicts } });
+      if (conflicts.length && !skip_conflicts) {
+        throw new AppError('RECURRING_CONFLICT', {
+          details: { dates: conflicts, sessions_total: dates.length, sessions_available: dates.length - conflicts.length },
+        });
+      }
+      dates = dates.filter((d) => !conflicts.includes(d));
+      if (dates.length === 0) throw new AppError('RECURRING_CONFLICT', { details: { dates: conflicts, sessions_available: 0 } });
 
       const discountPercent = contractDiscount(
         (
@@ -401,7 +420,13 @@ router.post('/recurring', requireAuthenticated, async (req, res, next) => {
         ]
       );
 
-      return { ...booking, slots, sessions_total: dates.length, contract_discount: discountPercent };
+      return {
+        ...booking,
+        slots,
+        sessions_total: dates.length,
+        skipped_dates: conflicts,
+        contract_discount: discountPercent,
+      };
     });
 
     res.status(201).json(out);
@@ -411,15 +436,28 @@ router.post('/recurring', requireAuthenticated, async (req, res, next) => {
 });
 
 // GET /api/bookings/:code
-router.get('/:code', async (req, res, next) => {
+// Chi nguoi dat, nguoi da duoc nhan vao tran, chu san va admin xem duoc (don co SDT, so tai khoan)
+router.get('/:code', requireAuthenticated, async (req, res, next) => {
   try {
     const b = await query(
-      `SELECT b.*, v.name AS venue_name, v.bank_name, v.bank_account, v.bank_holder
+      `SELECT b.*, v.name AS venue_name, v.bank_name, v.bank_account, v.bank_holder, v.owner_id AS venue_owner_id,
+              (SELECT COALESCE(sum(t.amount), 0) FROM bank_transaction t
+                WHERE t.booking_id = b.id AND t.status IN ('PARTIAL', 'APPLIED'))
+                + (SELECT COALESCE(sum(pw.amount), 0) FROM payment pw
+                    WHERE pw.booking_id = b.id AND pw.method = 'WALLET' AND pw.status = 'SUCCESS') AS amount_received,
+              (SELECT COALESCE(sum(t.amount), 0) FROM bank_transaction t
+                WHERE t.booking_id = b.id AND t.status = 'REFUND_PENDING') AS refund_pending_amount,
+              EXISTS (SELECT 1 FROM match_participant mp
+                       WHERE mp.booking_id = b.id AND mp.user_id = $2 AND mp.cancelled_at IS NULL) AS is_participant
          FROM booking b JOIN venue v ON v.id = b.venue_id
         WHERE b.code = $1`,
-      [req.params.code]
+      [req.params.code, req.user.id]
     );
     if (b.rowCount === 0) throw new AppError('BOOKING_NOT_FOUND', { details: { code: req.params.code } });
+    const row = b.rows[0];
+    const allowed =
+      row.user_id === req.user.id || row.venue_owner_id === req.user.id || row.is_participant || req.user.role === 'ADMIN';
+    if (!allowed) throw new AppError('FORBIDDEN');
 
     const pays = await query(
       `SELECT id, method, status, amount, provider_ref, bill_image_url, paid_at, created_at
@@ -529,8 +567,8 @@ router.post('/:code/rate', requireAuthenticated, async (req, res, next) => {
   }
 });
 
-// POST /api/bookings/release-expired  -> goi ham don don qua han
-router.post('/maintenance/release-expired', async (req, res, next) => {
+// POST /api/bookings/maintenance/release-expired  -> goi tay ham don don qua han (job nen da chay moi 60 giay)
+router.post('/maintenance/release-expired', requireAuthenticated, requireRole('ADMIN'), async (req, res, next) => {
   try {
     const r = await query(`SELECT fn_release_expired_holds() AS released`);
     res.json({ released: r.rows[0].released });

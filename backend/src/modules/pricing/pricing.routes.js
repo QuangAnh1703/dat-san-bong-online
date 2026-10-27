@@ -152,9 +152,9 @@ router.post('/:venueId', requireAuthenticated, requireRole('OWNER', 'ADMIN'), as
     // Handle GIST constraint violation (overlapping time slots)
     if (err.code === '23P01') {
       return next(
-        new AppError('CONSTRAINT_VIOLATED', {
-          message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
-          details: { error: 'PRICE_SLOT_OVERLAP' },
+        new AppError('PRICE_SLOT_OVERLAP', {
+          message: `Khung giờ cài đặt giá bị chồng lấp (${req.body?.from_time || '?'}-${req.body?.to_time || '?'}). Vui lòng kiểm tra lại!`,
+          details: { from_time: req.body?.from_time, to_time: req.body?.to_time },
           cause: err,
         })
       );
@@ -263,9 +263,9 @@ router.put('/:venueId/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'),
     // Handle GIST constraint violation
     if (err.code === '23P01') {
       return next(
-        new AppError('CONSTRAINT_VIOLATED', {
-          message: 'Khung giờ cài đặt giá bị chồng lấp với khung giờ khác',
-          details: { error: 'PRICE_SLOT_OVERLAP' },
+        new AppError('PRICE_SLOT_OVERLAP', {
+          message: `Khung giờ cài đặt giá bị chồng lấp (${req.body?.from_time || '?'}-${req.body?.to_time || '?'}). Vui lòng kiểm tra lại!`,
+          details: { from_time: req.body?.from_time, to_time: req.body?.to_time },
           cause: err,
         })
       );

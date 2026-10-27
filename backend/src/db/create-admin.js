@@ -20,7 +20,9 @@ async function main() {
     process.exit(1);
   }
   if (!EMAIL_RE.test(email)) throw new Error('Email khong hop le');
-  if (password.length < 6) throw new Error('Mat khau phai co it nhat 6 ky tu');
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    throw new Error('Mat khau phai co it nhat 8 ky tu, gom ca chu va so');
+  }
 
   const hash = await bcrypt.hash(password, 10);
   const out = await withTransaction(async (c) => {

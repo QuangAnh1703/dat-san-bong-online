@@ -4,6 +4,7 @@ const { query, withTransaction } = require('../../db');
 const { AppError, requireFields } = require('../../lib/errors');
 const { requireAuthenticated } = require('../../middlewares/auth');
 const repo = require('./freelance.repository');
+const { joinMatchChat, leaveMatchChat } = require('./community.repository');
 
 const router = express.Router();
 router.use(requireAuthenticated);
@@ -372,7 +373,9 @@ router.put('/requests/:id', async (req, res, next) => {
             [jr.post_id, jr.id]
           );
         }
-        await addParticipant(c, bookingId, jr.kind === 'APPLY' ? jr.requester_user_id : req.user.id);
+        const playerId = jr.kind === 'APPLY' ? jr.requester_user_id : req.user.id;
+        await addParticipant(c, bookingId, playerId);
+        await joinMatchChat(c, { bookingId, userIds: [booking.user_id, playerId] });
       }
 
       await c.query(`UPDATE join_request SET status = $2, responded_at = now() WHERE id = $1`, [jr.id, status]);
@@ -428,6 +431,7 @@ router.post('/matches/:code/leave', async (req, res, next) => {
 
       const minutesLeft = (new Date(booking.start_at) - new Date()) / 60000;
       if (minutesLeft <= 0) throw new AppError('BOOKING_ALREADY_STARTED');
+      await leaveMatchChat(c, booking.id, req.user.id);
       const late = minutesLeft < LATE_CANCEL_MINUTES;
 
       await c.query(

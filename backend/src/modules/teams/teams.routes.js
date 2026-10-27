@@ -9,7 +9,7 @@ const SKILLS = ['BEGINNER', 'INTERMEDIATE', 'GOOD', 'SEMI_PRO'];
 
 router.use(requireAuthenticated);
 
-const TEAM_COLUMNS = `id, name, captain_id, district_code, skill_level, member_count,
+const TEAM_COLUMNS = `id, name, captain_id, district_code, skill_level, member_count, elo, wins, draws, losses, win_streak, fund_balance,
                       reputation_score, total_matches, created_at`;
 
 // GET /api/teams/me - Doi ma nguoi dung dang lam doi truong (null neu chua co)

@@ -233,6 +233,34 @@ async function addConversationMember({ conversation_id, user_id }) {
   return result.rows[0];
 }
 
+// Nhóm chat của trận: một hội thoại / đơn đặt sân, thêm thành viên khi được nhận vào trận.
+// `db` là client trong giao dịch.
+async function joinMatchChat(db, { bookingId, matchPostId = null, userIds }) {
+  const c = await db.query(
+    `INSERT INTO conversation (booking_id, match_post_id) VALUES ($1, $2)
+     ON CONFLICT (booking_id) WHERE booking_id IS NOT NULL
+     DO UPDATE SET match_post_id = COALESCE(conversation.match_post_id, EXCLUDED.match_post_id)
+     RETURNING id`,
+    [bookingId, matchPostId]
+  );
+  const conversationId = c.rows[0].id;
+  for (const userId of userIds) {
+    await db.query(
+      `INSERT INTO conversation_member (conversation_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [conversationId, userId]
+    );
+  }
+  return conversationId;
+}
+
+async function leaveMatchChat(db, bookingId, userId) {
+  await db.query(
+    `DELETE FROM conversation_member cm USING conversation c
+      WHERE c.id = cm.conversation_id AND c.booking_id = $1 AND cm.user_id = $2`,
+    [bookingId, userId]
+  );
+}
+
 async function listMessages({ conversation_id, limit = 50, offset = 0 }) {
   const result = await query(
     `SELECT * FROM message WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
@@ -297,6 +325,8 @@ module.exports = {
   addConversationMember,
   listMessages,
   createMessage,
+  joinMatchChat,
+  leaveMatchChat,
   getUserProfile,
   getTeamDetails,
   getTeamMembers,

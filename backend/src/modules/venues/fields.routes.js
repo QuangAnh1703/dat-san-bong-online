@@ -57,8 +57,8 @@ router.post('/', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req
       );
     }
 
-    if (typeof name !== 'string' || name.trim().length === 0 || name.length > 120) {
-      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 120 chars' } }));
+    if (typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 50 chars' } }));
     }
 
     if (req.user.role !== 'ADMIN') {
@@ -98,11 +98,20 @@ router.put('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (r
       }
     }
 
-    if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.length > 120)) {
-      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 120 chars' } }));
+    if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.length > 50)) {
+      return next(new AppError('INVALID_FIELD', { details: { field: 'name', reason: 'Max 50 chars' } }));
     }
 
-    const updates = ['updated_at = now()'];
+    if (req.user.role !== 'ADMIN') {
+      const own = await query(
+        `SELECT 1 FROM field f JOIN venue v ON v.id = f.venue_id WHERE f.id = $1 AND v.owner_id = $2`,
+        [fieldId, req.user.id]
+      );
+      if (own.rowCount === 0) throw new AppError('FORBIDDEN');
+    }
+
+    // Bang field khong co cot updated_at
+    const updates = [];
     const values = [fieldId];
     let paramCount = 2;
 
@@ -122,6 +131,7 @@ router.put('/:id', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (r
       paramCount++;
     }
 
+    if (updates.length === 0) return res.json({ message: 'No changes' });
     const updateQuery = `UPDATE field SET ${updates.join(', ')} WHERE id = $1 RETURNING *`;
     const result = await query(updateQuery, values);
 

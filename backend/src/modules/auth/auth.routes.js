@@ -22,8 +22,56 @@ const router = express.Router();
 // Initialize Google OAuth
 initGoogleOAuth();
 
-// Email validation
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Dang nhap chap nhan moi SDT 10 so (tai khoan cu); dang ky chi nhan dau so di dong VN
+const PHONE_RE = /^0[0-9]{9}$/;
+const MOBILE_RE = /^0[35789][0-9]{8}$/;
+const VALID_ROLES = ['PLAYER', 'OWNER'];
+const TEMP_TOKEN_TTL = '10m';
+
+function assertStrongPassword(password) {
+  const p = String(password);
+  if (p.length < 8 || !/[A-Za-z]/.test(p) || !/[0-9]/.test(p)) throw new AppError('WEAK_PASSWORD');
+}
+
+function assertRole(role) {
+  if (!VALID_ROLES.includes(role)) {
+    throw new AppError('INVALID_FIELD', {
+      details: { field: 'role', reason: `Must be one of: ${VALID_ROLES.join(', ')}` },
+    });
+  }
+}
+
+// temp_token phai co chu ky: neu chi la base64 thi ai cung tu tao duoc token cho email bat ky
+function signTempToken(email, purpose) {
+  return jwt.sign({ email, purpose }, process.env.JWT_ACCESS_SECRET, { expiresIn: TEMP_TOKEN_TTL });
+}
+
+function verifyTempToken(token, purpose) {
+  let data;
+  try {
+    data = jwt.verify(String(token), process.env.JWT_ACCESS_SECRET);
+  } catch (e) {
+    throw new AppError(e.name === 'TokenExpiredError' ? 'OTP_EXPIRED' : 'INVALID_TEMP_TOKEN');
+  }
+  if (data.purpose !== purpose || !data.email) throw new AppError('INVALID_TEMP_TOKEN');
+  return data.email;
+}
+
+function mapOtpError(err) {
+  if (err.message === 'OTP_EXPIRED') return new AppError('OTP_EXPIRED');
+  if (err.message.startsWith('OTP_LOCKED')) {
+    return new AppError('OTP_RATE_LIMITED', { details: { retry_after: parseInt(err.message.split('_')[2], 10) } });
+  }
+  if (err.message.startsWith('OTP_INVALID')) {
+    const left = parseInt(err.message.split('_')[2], 10);
+    return new AppError('OTP_INVALID', {
+      message: `Mã OTP không đúng. Còn ${left} lần thử`,
+      details: { attempts_left: left },
+    });
+  }
+  return err;
+}
 
 function toSafeUser(user) {
   const { password_hash, ...safe } = user;
@@ -52,12 +100,12 @@ router.post('/login', async (req, res, next) => {
     }
     // Đăng nhập bằng phone
     else if (phone_number) {
-      const PHONE_RE = /^0[0-9]{9}$/;
       if (!PHONE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
       user = await findByPhone(phone_number);
     }
 
-    const ok = user && (await bcrypt.compare(password, user.password_hash));
+    // Tai khoan tao qua Google khong co mat khau: bcrypt.compare voi hash null se nem loi 500
+    const ok = user && user.password_hash && (await bcrypt.compare(String(password), user.password_hash));
     if (!ok) throw new AppError('INVALID_CREDENTIALS');
     if (user.status === 'LOCKED') throw new AppError('ACCOUNT_LOCKED');
 
@@ -114,12 +162,7 @@ router.post('/request-otp', async (req, res, next) => {
     await storeOtp(email, 'REGISTER');
     res.json({ message: 'OTP sent to email', email: email.replace(/.{1,}@/, '*@') });
   } catch (err) {
-    if (err.message.startsWith('OTP_LOCKED')) {
-      const seconds = err.message.split('_')[2];
-      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
-    } else {
-      next(err);
-    }
+    next(mapOtpError(err));
   }
 });
 
@@ -132,23 +175,10 @@ router.post('/verify-otp', async (req, res, next) => {
 
     if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
 
-    await verifyOtp(email, otp, 'REGISTER');
-
-    // Return temp token (valid for 10 minutes to register)
-    const tempToken = Buffer.from(JSON.stringify({ email, verified_at: Date.now() })).toString('base64');
-    res.json({ temp_token: tempToken });
+    await verifyOtp(email, String(otp), 'REGISTER');
+    res.json({ temp_token: signTempToken(email.toLowerCase(), 'register') });
   } catch (err) {
-    if (err.message === 'OTP_EXPIRED') {
-      next(new AppError('OTP_EXPIRED'));
-    } else if (err.message.startsWith('OTP_LOCKED')) {
-      const seconds = err.message.split('_')[2];
-      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
-    } else if (err.message.startsWith('OTP_INVALID')) {
-      const left = err.message.split('_')[2];
-      next(new AppError('OTP_INVALID', { message: `OTP khong dung. Con ${left}` }));
-    } else {
-      next(err);
-    }
+    next(mapOtpError(err));
   }
 });
 
@@ -160,30 +190,9 @@ router.post('/register-with-otp', async (req, res, next) => {
     const { temp_token, password, full_name, district_code, role = 'PLAYER' } = req.body || {};
     requireFields(req.body, ['temp_token', 'password', 'full_name']);
 
-    if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
-
-    // Validate role
-    const validRoles = ['PLAYER', 'OWNER'];
-    if (!validRoles.includes(role)) {
-      throw new AppError('INVALID_FIELD', {
-        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` },
-      });
-    }
-
-    // Decode temp token
-    let verified;
-    try {
-      const data = JSON.parse(Buffer.from(temp_token, 'base64').toString());
-      if (Date.now() - data.verified_at > 10 * 60 * 1000) {
-        throw new AppError('OTP_EXPIRED');
-      }
-      verified = data;
-    } catch (e) {
-      throw new AppError('INVALID_TEMP_TOKEN');
-    }
-
-    const { email } = verified;
-    if (!email) throw new AppError('INVALID_TEMP_TOKEN');
+    assertStrongPassword(password);
+    assertRole(role);
+    const email = verifyTempToken(temp_token, 'register');
 
     const existing = await findByEmail(email);
     if (existing) throw new AppError('EMAIL_TAKEN');
@@ -215,18 +224,9 @@ router.post('/register-with-phone', async (req, res, next) => {
     const { phone_number, password, full_name, district_code, role = 'PLAYER' } = req.body || {};
     requireFields(req.body, ['phone_number', 'password', 'full_name']);
 
-    const PHONE_RE = /^0[0-9]{9}$/;
-    if (!PHONE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
-
-    if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
-
-    // Validate role
-    const validRoles = ['PLAYER', 'OWNER'];
-    if (!validRoles.includes(role)) {
-      throw new AppError('INVALID_FIELD', {
-        details: { field: 'role', reason: `Must be one of: ${validRoles.join(', ')}` },
-      });
-    }
+    if (!MOBILE_RE.test(phone_number)) throw new AppError('INVALID_PHONE');
+    assertStrongPassword(password);
+    assertRole(role);
 
     const existing = await findByPhone(phone_number);
     if (existing) throw new AppError('PHONE_TAKEN');
@@ -501,6 +501,22 @@ router.get('/google', (req, res, next) => {
 });
 
 // GET /api/auth/google/callback - Handle Google OAuth callback
+// Luon redirect ve frontend: thanh cong kem token, that bai kem ?error=<ma loi>
+function redirectToFrontend(res, params) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${frontendUrl}/auth/google-callback?${new URLSearchParams(params).toString()}`);
+}
+
+async function finishGoogleLogin(res, user) {
+  // Tai khoan bi admin khoa khong duoc vao lai bang Google
+  if (user.status === 'LOCKED') return redirectToFrontend(res, { error: 'ACCOUNT_LOCKED' });
+  await touchLastLogin(user.id);
+  redirectToFrontend(res, {
+    access_token: signAccessToken(user),
+    refresh_token: signRefreshToken(user),
+  });
+}
+
 router.get('/google/callback', async (req, res, next) => {
   try {
     const { handleGoogleCallbackMock } = require('./google-oauth.service');
@@ -509,51 +525,20 @@ router.get('/google/callback', async (req, res, next) => {
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
     const hasRealConfig = clientID && clientSecret && !clientID.includes('mock');
 
-    let user;
-
-    // Mock mode
     if (!hasRealConfig && isDev && (req.query.email || req.query.name)) {
-      const result = await handleGoogleCallbackMock(req, res);
-      user = result.user;
-    } else if (hasRealConfig) {
-      // Real Google OAuth
-      return passport.authenticate('google', { session: false }, async (err, authenticatedUser) => {
-        if (err || !authenticatedUser) {
-          return next(new AppError('GOOGLE_LOGIN_FAILED', { cause: err }));
-        }
-        user = authenticatedUser;
-        await touchLastLogin(user.id);
-        const safeUser = toSafeUser(user);
-        const tokens = {
-          access_token: signAccessToken(user),
-          refresh_token: signRefreshToken(user),
-          user: safeUser,
-        };
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const params = new URLSearchParams();
-        params.set('access_token', tokens.access_token);
-        params.set('refresh_token', tokens.refresh_token);
-        params.set('user', JSON.stringify(tokens.user));
-        res.redirect(`${frontendUrl}/auth/google-callback?${params.toString()}`);
-      })(req, res, next);
-    } else {
-      return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED'));
+      const { user } = await handleGoogleCallbackMock(req, res);
+      return finishGoogleLogin(res, user);
     }
+    if (!hasRealConfig) return next(new AppError('GOOGLE_OAUTH_NOT_CONFIGURED'));
 
-    // Handle mock flow response
-    await touchLastLogin(user.id);
-    const safeUser = toSafeUser(user);
-    const tokens = {
-      access_token: signAccessToken(user),
-      refresh_token: signRefreshToken(user),
-      user: safeUser,
-    };
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const params = new URLSearchParams();
-    params.set('access_token', tokens.access_token);
-    params.set('refresh_token', tokens.refresh_token);
-    params.set('user', JSON.stringify(tokens.user));
-    res.redirect(`${frontendUrl}/auth/google-callback?${params.toString()}`);
+    passport.authenticate('google', { session: false }, async (err, user) => {
+      try {
+        if (err || !user) return redirectToFrontend(res, { error: 'GOOGLE_LOGIN_FAILED' });
+        await finishGoogleLogin(res, user);
+      } catch (e) {
+        next(e);
+      }
+    })(req, res, next);
   } catch (err) {
     next(err);
   }
@@ -585,12 +570,7 @@ router.post('/forgot-password', async (req, res, next) => {
     await storeOtp(email, 'RESET_PASSWORD');
     res.json({ message: 'OTP sent to email', email: email.replace(/.{1,}@/, '*@') });
   } catch (err) {
-    if (err.message.startsWith('OTP_LOCKED')) {
-      const seconds = err.message.split('_')[2];
-      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
-    } else {
-      next(err);
-    }
+    next(mapOtpError(err));
   }
 });
 
@@ -603,25 +583,10 @@ router.post('/verify-reset-otp', async (req, res, next) => {
 
     if (!EMAIL_RE.test(email)) throw new AppError('INVALID_EMAIL');
 
-    await verifyOtp(email, otp, 'RESET_PASSWORD');
-
-    // Return temp token (valid for 10 minutes)
-    const tempToken = Buffer.from(
-      JSON.stringify({ email, verified_at: Date.now(), action: 'reset_password' })
-    ).toString('base64');
-    res.json({ temp_token: tempToken });
+    await verifyOtp(email, String(otp), 'RESET_PASSWORD');
+    res.json({ temp_token: signTempToken(email.toLowerCase(), 'reset_password') });
   } catch (err) {
-    if (err.message === 'OTP_EXPIRED') {
-      next(new AppError('OTP_EXPIRED'));
-    } else if (err.message.startsWith('OTP_LOCKED')) {
-      const seconds = err.message.split('_')[2];
-      next(new AppError('OTP_RATE_LIMITED', { details: { retry_after: seconds } }));
-    } else if (err.message.startsWith('OTP_INVALID')) {
-      const left = err.message.split('_')[2];
-      next(new AppError('OTP_INVALID', { message: `OTP khong dung. Con ${left}` }));
-    } else {
-      next(err);
-    }
+    next(mapOtpError(err));
   }
 });
 
@@ -632,24 +597,8 @@ router.post('/reset-password', async (req, res, next) => {
     const { temp_token, password } = req.body || {};
     requireFields(req.body, ['temp_token', 'password']);
 
-    if (String(password).length < 6) throw new AppError('WEAK_PASSWORD');
-
-    // Decode temp token
-    let verified;
-    try {
-      const data = JSON.parse(Buffer.from(temp_token, 'base64').toString());
-      if (data.action !== 'reset_password') {
-        throw new AppError('INVALID_TEMP_TOKEN');
-      }
-      if (Date.now() - data.verified_at > 10 * 60 * 1000) {
-        throw new AppError('OTP_EXPIRED');
-      }
-      verified = data;
-    } catch (e) {
-      throw new AppError('INVALID_TEMP_TOKEN');
-    }
-
-    const { email } = verified;
+    assertStrongPassword(password);
+    const email = verifyTempToken(temp_token, 'reset_password');
     const user = await findByEmail(email);
     if (!user) throw new AppError('USER_NOT_FOUND');
 

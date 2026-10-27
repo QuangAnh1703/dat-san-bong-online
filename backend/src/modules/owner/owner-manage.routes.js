@@ -5,6 +5,7 @@ const { AppError, requireFields } = require('../../lib/errors');
 const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
 const { quoteSlot } = require('../../services/pricing.service');
+const { MAX_DIRECT_DAYS, parseRange, periodRange, buildReport } = require('../../services/report.service');
 
 // Cac chuc nang van hanh cua chu san (WF-10/11): don dat, khoa slot, flash sale
 const router = express.Router();
@@ -40,13 +41,48 @@ async function lockBookingForOwner(c, code, user) {
 router.get('/venues', async (req, res, next) => {
   try {
     const r = await query(
-      `SELECT v.id, v.name, v.address, v.status, d.name AS district_name
+      `SELECT v.id, v.name, v.address, v.status, v.district_code, d.name AS district_name, v.phone,
+              v.latitude, v.longitude, v.description, v.open_time, v.close_time, v.deposit_rate,
+              v.bank_name, v.bank_account, v.bank_holder, v.created_at, v.updated_at,
+              COALESCE((SELECT json_agg(json_build_object('id', f.id, 'name', f.name, 'type', f.type,
+                                                          'is_active', f.is_active) ORDER BY f.name)
+                          FROM field f WHERE f.venue_id = v.id), '[]') AS fields,
+              COALESCE((SELECT array_agg(va.amenity_code) FROM venue_amenity va WHERE va.venue_id = v.id), '{}')
+                AS amenities,
+              (SELECT va.reason FROM venue_approval va
+                WHERE va.venue_id = v.id AND va.action = 'REJECT'
+                ORDER BY va.created_at DESC LIMIT 1) AS reject_reason
          FROM venue v JOIN district d ON d.code = v.district_code
         WHERE $1::bigint IS NULL OR v.owner_id = $1
         ORDER BY v.created_at`,
       [req.user.role === 'ADMIN' ? null : req.user.id]
     );
     res.json({ count: r.rowCount, data: r.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/owner/reports?venue_id=&period=day|week|month  (hoac &from=&to=)
+// Bao cao chu san (PRD 2.4): luot dat, doanh thu, tien coc, ty le lap day theo khung gio
+router.get('/reports', async (req, res, next) => {
+  try {
+    const venueId = Number(req.query.venue_id);
+    if (!venueId) throw new AppError('MISSING_FIELD', { details: { missing: ['venue_id'] } });
+    await assertVenueAccess({ query }, venueId, req.user);
+    let range;
+    if (req.query.from || req.query.to) range = parseRange(req.query);
+    else {
+      const period = req.query.period || 'month';
+      if (!['day', 'week', 'month'].includes(period)) {
+        throw new AppError('INVALID_FIELD', { details: { field: 'period', reason: 'day | week | month' } });
+      }
+      range = periodRange(period);
+    }
+    if (range.days > MAX_DIRECT_DAYS) {
+      throw new AppError('INVALID_TIME_RANGE', { details: { max_days: MAX_DIRECT_DAYS } });
+    }
+    res.json(await buildReport({ query }, { ...range, venueId }));
   } catch (err) {
     next(err);
   }
@@ -68,16 +104,20 @@ router.get('/bookings', async (req, res, next) => {
 
     const r = await query(
       `SELECT b.id, b.code, b.kind, b.status, b.total_amount, b.deposit_amount, b.discount_amount,
-              b.guest_name, b.guest_phone, b.note, b.hold_expires_at, b.created_at,
+              b.guest_name, b.guest_phone, b.note, b.hold_expires_at, b.created_at, b.checked_out_at,
               COALESCE(p.full_name, b.guest_name) AS customer_name,
               COALESCE(b.guest_phone, u.phone) AS customer_phone,
               t.name AS team_name,
+              (SELECT COALESCE(sum(bt.amount), 0) FROM bank_transaction bt
+                WHERE bt.booking_id = b.id AND bt.status IN ('PARTIAL', 'APPLIED'))
+                + (SELECT COALESCE(sum(pw.amount), 0) FROM payment pw
+                    WHERE pw.booking_id = b.id AND pw.method = 'WALLET' AND pw.status = 'SUCCESS') AS amount_received,
               (SELECT json_agg(json_build_object(
                         'field_name', f.name, 'play_date', s.play_date,
                         'start_at', lower(s.time_range), 'end_at', upper(s.time_range), 'status', s.status)
                         ORDER BY lower(s.time_range))
                  FROM booking_slot s JOIN field f ON f.id = s.field_id WHERE s.booking_id = b.id) AS slots,
-              (SELECT json_agg(json_build_object('name', bs.name, 'price', bs.price))
+              (SELECT json_agg(json_build_object('name', bs.name, 'price', bs.price, 'quantity', bs.quantity))
                  FROM booking_service bs WHERE bs.booking_id = b.id) AS services,
               (SELECT json_build_object('status', pm.status, 'amount', pm.amount,
                                         'bill_image_url', pm.bill_image_url, 'created_at', pm.created_at)

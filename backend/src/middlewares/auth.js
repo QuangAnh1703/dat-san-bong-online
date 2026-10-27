@@ -9,7 +9,9 @@ const { AppError } = require('../lib/errors');
 
 function verifyAccessToken(req, res, next) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
+  // Chi doc scheme Bearer: webhook ngan hang dung "Authorization: Apikey ..." tren cung header
+  const [scheme, token] = (authHeader || '').split(' ');
+  if (!/^Bearer$/i.test(scheme)) return next();
 
   // No token - user is anonymous (may be OK for public endpoints)
   if (!token) {

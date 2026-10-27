@@ -16,12 +16,13 @@ const ERRORS = {
   MISSING_FIELD: { status: 400, message: 'Thieu truong bat buoc' },
   INVALID_TIME_RANGE: { status: 400, message: 'Khung gio khong hop le' },
   CONSTRAINT_VIOLATED: { status: 400, message: 'Du lieu vi pham rang buoc nghiep vu' },
-  INVALID_PHONE: { status: 400, message: 'So dien thoai khong hop le (10 so, bat dau bang 0)' },
+  INVALID_PHONE: { status: 400, message: 'Số điện thoại phải bao gồm đúng 10 chữ số, đầu số di động Việt Nam (VD: 0912345678)' },
   INVALID_EMAIL: { status: 400, message: 'Email khong hop le' },
-  WEAK_PASSWORD: { status: 400, message: 'Mat khau phai co it nhat 6 ky tu' },
-  OTP_INVALID: { status: 400, message: 'Ma OTP khong dung' },
-  OTP_EXPIRED: { status: 400, message: 'Ma OTP da het han (15 phut)' },
-  INVALID_TEMP_TOKEN: { status: 400, message: 'Phuong thuc xac thuc khong hop le' },
+  WEAK_PASSWORD: { status: 400, message: 'Mật khẩu quá yếu! Dùng ít nhất 8 ký tự gồm cả chữ và số' },
+  SLOT_IN_PAST: { status: 400, message: 'Không thể chọn khung giờ đã trôi qua!' },
+  OTP_INVALID: { status: 400, message: 'Mã OTP không đúng' },
+  OTP_EXPIRED: { status: 400, message: 'Mã OTP đã hết hạn, vui lòng gửi lại mã' },
+  INVALID_TEMP_TOKEN: { status: 400, message: 'Phiên xác thực OTP không hợp lệ, vui lòng làm lại' },
   INVALID_FIELD: { status: 400, message: 'Gia tri truong khong hop le' },
   INVALID_RATING: { status: 400, message: 'Diem danh gia phai tu 1 den 5' },
   INVALID_OPERATION: { status: 400, message: 'Thao tac khong hop le' },
@@ -38,6 +39,7 @@ const ERRORS = {
   INVALID_CREDENTIALS: { status: 401, message: 'So dien thoai hoac mat khau khong dung' },
   ACCOUNT_LOCKED: { status: 403, message: 'Tai khoan da bi khoa, vui long lien he quan tri vien' },
   GOOGLE_LOGIN_FAILED: { status: 401, message: 'Dang nhap Google that bai' },
+  BANK_WEBHOOK_UNAUTHORIZED: { status: 401, message: 'Webhook ngan hang sai khoa xac thuc' },
 
   // --- 404 ---
   NOT_FOUND: { status: 404, message: 'Khong tim thay du lieu' },
@@ -49,6 +51,7 @@ const ERRORS = {
   POST_NOT_FOUND: { status: 404, message: 'Khong tim thay bai dang' },
   REQUEST_NOT_FOUND: { status: 404, message: 'Khong tim thay loi moi' },
   TICKET_NOT_FOUND: { status: 404, message: 'Khong tim thay khieu nai' },
+  TRANSACTION_NOT_FOUND: { status: 404, message: 'Không tìm thấy giao dịch chuyển khoản' },
   OWNER_REQUEST_NOT_FOUND: { status: 404, message: 'Khong tim thay yeu cau chu san' },
   VENUE_NOT_FOUND_OR_NOT_PENDING: {
     status: 404,
@@ -75,16 +78,29 @@ const ERRORS = {
   PLAYER_POST_OVERLAP: { status: 409, message: 'Bạn đã có bài đăng tìm đội trong khoảng thời gian này!' },
   INVITE_EXPIRED: { status: 409, message: 'Lời mời đã hết hạn (quá 30 phút không phản hồi)' },
   ALREADY_IN_MATCH: { status: 409, message: 'Bạn đã có tên trong danh sách trận này' },
+  SCHEDULE_CONFLICT: { status: 409, message: 'Đội của bạn đã có một lịch đá khác vào khung giờ này!' },
+  MATCH_TOO_SOON: { status: 409, message: 'Trận đấu sắp diễn ra, không đủ thời gian tìm đối thủ!' },
   POST_NOT_OPEN: { status: 409, message: 'Bai dang da dong' },
+  OUT_OF_STOCK: { status: 409, message: 'Mặt hàng đã hết trong kho' },
+  RENTAL_CHECK_REQUIRED: { status: 409, message: 'Đơn có đồ cho thuê, hãy kiểm tra khách đã trả đủ đồ trước khi check-out' },
+  SPLIT_EXISTS: { status: 409, message: 'Trận này đã được chia tiền' },
+  SPLIT_AMOUNT_MISMATCH: { status: 400, message: 'Tổng số tiền chia chưa khớp tổng chi phí trận' },
+  WALLET_EMPTY: { status: 409, message: 'Ví hội viên chưa có số dư tại cụm sân này' },
+  WALLET_FROZEN: { status: 409, message: 'Ví hội viên đang bị đóng băng, chờ quản trị viên hoàn trả' },
+  TOURNAMENT_BANNED: { status: 409, message: 'Đội của bạn đang bị cấm đăng ký giải' },
+  TOURNAMENT_FULL: { status: 409, message: 'Giải đã đủ số đội' },
+  TRANSACTION_ALREADY_HANDLED: { status: 409, message: 'Giao dịch này đã được xử lý' },
   RECURRING_CONFLICT: { status: 409, message: 'Mot so buoi trong lich dinh ky da co nguoi dat' },
 
   // --- 429 Rate limit ---
-  OTP_RATE_LIMITED: { status: 429, message: 'Da nhap sai qua nhieu lan. Vui long thu lai sau' },
+  OTP_RATE_LIMITED: { status: 429, message: 'Đã nhập sai quá nhiều lần. Tạm khóa gửi OTP 15 phút' },
+  OWNER_HAS_UPCOMING_BOOKINGS: { status: 409, message: 'Chủ sân đang có đơn đặt chưa diễn ra' },
 
   // --- 5xx ---
   DB_UNAVAILABLE: { status: 503, message: 'Khong ket noi duoc co so du lieu' },
   INTERNAL_ERROR: { status: 500, message: 'Loi may chu' },
   NOT_IMPLEMENTED: { status: 501, message: 'Chuc nang chua duoc trien khai' },
+  PAYMENT_GATEWAY_NOT_CONFIGURED: { status: 503, message: 'Cổng thanh toán chưa được cấu hình' },
   GOOGLE_OAUTH_NOT_CONFIGURED: { status: 503, message: 'Dang nhap Google chua duoc cau hinh' },
 };
 
@@ -129,6 +145,12 @@ function fromDbError(err) {
       return new AppError('CONSTRAINT_VIOLATED', {
         message: 'Du lieu da ton tai',
         details: { constraint: err.constraint },
+        cause: err,
+      });
+    case '23502': // not_null_violation
+      return new AppError('MISSING_FIELD', {
+        message: `Thieu truong bat buoc: ${err.column}`,
+        details: { missing: [err.column] },
         cause: err,
       });
     case '23503': // foreign_key_violation

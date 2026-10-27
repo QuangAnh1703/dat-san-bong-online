@@ -60,4 +60,16 @@ async function sendOtpEmail(email, otp) {
   }
 }
 
-module.exports = { initializeEmail, sendOtpEmail };
+/** Gui email kem file dinh kem (vd. bao cao xuat nen cho Admin) */
+async function sendMailWithAttachment({ to, subject, html, filename, content }) {
+  if (!transporter) await initializeEmail();
+  return transporter.sendMail({
+    from: process.env.GMAIL_USER,
+    to,
+    subject,
+    html,
+    attachments: [{ filename, content, contentType: 'text/csv; charset=utf-8' }],
+  });
+}
+
+module.exports = { initializeEmail, sendOtpEmail, sendMailWithAttachment };

@@ -53,6 +53,15 @@ router.get('/api/districts', async (_req, res, next) => {
   }
 });
 
+router.get('/api/amenities', async (_req, res, next) => {
+  try {
+    const r = await query(`SELECT code, name, icon FROM amenity ORDER BY name`);
+    res.json({ count: r.rowCount, data: r.rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // --- Tai lieu API ---
 const SPEC_FILE = path.join(__dirname, '..', '..', '..', 'docs', 'openapi.yaml');
 
@@ -88,11 +97,17 @@ router.use('/api/venues', require('../modules/venues/venues.routes'));
 router.use('/api/fields', require('../modules/venues/fields.routes'));
 router.use('/api/pricing', require('../modules/pricing/pricing.routes'));
 router.use('/api/bookings', require('../modules/bookings/bookings.routes'));
+// VNPay, webhook ngan hang gan truoc: return / IPN / webhook / trang gia lap khong co token, con /api/payments yeu cau dang nhap
+router.use('/api/payments/vnpay', require('../modules/payments/vnpay.routes'));
+router.use('/api/payments/bank', require('../modules/payments/bank.routes'));
 router.use('/api/payments', require('../modules/payments/payments.routes'));
 router.use('/api/community', require('../modules/community/community.routes'));
 router.use('/api/freelance', require('../modules/community/freelance.routes'));
 router.use('/api/notifications', require('../modules/notifications/notifications.routes'));
 router.use('/api/teams', require('../modules/teams/teams.routes'));
+router.use('/api/splits', require('../modules/teams/split.routes'));
+router.use('/api/wallets', require('../modules/wallets/wallet.routes'));
+router.use('/api', require('../modules/leagues/league.routes'));
 router.use('/api/complaints', require('../modules/complaints/complaints.routes'));
 
 module.exports = router;

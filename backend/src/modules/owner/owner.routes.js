@@ -72,5 +72,6 @@ router.get('/me', requireAuthenticated, async (req, res, next) => {
 
 // Dat sau /request va /me: router nay yeu cau vai tro OWNER/ADMIN cho moi request di qua
 router.use(require('./owner-manage.routes'));
+router.use(require('./pos.routes'));
 
 module.exports = router;

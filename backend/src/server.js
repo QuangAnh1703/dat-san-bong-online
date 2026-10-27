@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const passport = require('passport');
 
-const { waitForDb, pool } = require('./db');
+const { waitForDb, pool, withTransaction } = require('./db');
 const { validate: validateSchema } = require('./db/migrate');
 const { connect: connectRedis } = require('./redis');
 const { initializeEmail } = require('./services/email.service');
@@ -13,6 +13,33 @@ const { verifyAccessToken, requireAuthenticated } = require('./middlewares/auth'
 const { checkPermission } = require('./middlewares/rbac');
 const routes = require('./routes');
 const { expireFreelance } = require('./modules/community/freelance.repository');
+const { flagRefundsForCancelled } = require('./services/bank-match.service');
+const { restockCancelled } = require('./services/inventory.service');
+const { remindOverdue } = require('./services/split.service');
+const { refundCancelledWalletPayments } = require('./services/wallet.service');
+const { voidExpiredDisputes } = require('./services/tournament.service');
+
+// Don da xac nhan va moi khung gio da qua -> COMPLETED, cong so tran cho nguoi dat va nguoi tham gia
+async function completeFinishedBookings(db) {
+  await db.query(
+    `WITH done AS (
+       UPDATE booking b SET status = 'COMPLETED'
+        WHERE b.status IN ('CONFIRMED', 'IN_PROGRESS') AND b.kind <> 'OWNER_LOCK'
+          AND EXISTS (SELECT 1 FROM booking_slot s WHERE s.booking_id = b.id AND s.status <> 'RELEASED')
+          AND NOT EXISTS (SELECT 1 FROM booking_slot s
+                           WHERE s.booking_id = b.id AND s.status <> 'RELEASED' AND upper(s.time_range) > now())
+       RETURNING b.id, b.user_id
+     ), players AS (
+       SELECT user_id FROM done
+       UNION ALL
+       SELECT mp.user_id FROM match_participant mp JOIN done ON done.id = mp.booking_id
+        WHERE mp.cancelled_at IS NULL AND mp.user_id <> done.user_id
+     )
+     UPDATE user_profile up SET total_matches = up.total_matches + x.n
+       FROM (SELECT user_id, count(*) AS n FROM players GROUP BY user_id) x
+      WHERE up.user_id = x.user_id`
+  );
+}
 
 const app = express();
 
@@ -80,6 +107,12 @@ const PORT = Number(process.env.PORT || 3000);
             AND b.status::text LIKE 'CANCELLED%'`
       );
       await expireFreelance(pool);
+      await withTransaction(flagRefundsForCancelled);
+      await withTransaction(restockCancelled);
+      await withTransaction(remindOverdue);
+      await withTransaction(refundCancelledWalletPayments);
+      await withTransaction(voidExpiredDisputes);
+      await completeFinishedBookings(pool);
       if (r.rows[0].released > 0) console.log('[hold] nha %d slot qua han', r.rows[0].released);
     } catch (err) {
       console.error('[hold] loi khi nha slot qua han: %s', err.message);
