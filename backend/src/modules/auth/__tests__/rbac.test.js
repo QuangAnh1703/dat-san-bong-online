@@ -8,8 +8,8 @@
  * - SCRUM-108: Players cannot call Owner/Admin endpoints
  */
 
-const { requireRole, permissions } = require('../../rbac');
-const { verifyAccessToken } = require('../../auth');
+const { requireRole, permissions } = require('../../../middlewares/rbac');
+const { verifyAccessToken } = require('../../../middlewares/auth');
 
 describe('RBAC - Role-Based Access Control', () => {
 
@@ -31,9 +31,9 @@ describe('RBAC - Role-Based Access Control', () => {
 
   describe('SCRUM-107: Endpoint Permissions by Role', () => {
 
-    test('Venues - PLAYER can view all venues', () => {
+    test('Venues - danh sách sân công khai (kể cả khách chưa đăng nhập)', () => {
       const viewVenues = permissions['GET /api/venues'];
-      expect(viewVenues).toContain('PLAYER');
+      expect(viewVenues).toEqual([]);
     });
 
     test('Venues - PLAYER cannot create venues', () => {
@@ -56,9 +56,9 @@ describe('RBAC - Role-Based Access Control', () => {
 
     test('Community - PLAYER can post and find teams', () => {
       const createPost = permissions['POST /api/community/posts'];
-      const matchPost = permissions['POST /api/community/posts/:id/match'];
+      const sendRequest = permissions['POST /api/community/requests'];
       expect(createPost).toContain('PLAYER');
-      expect(matchPost).toContain('PLAYER');
+      expect(sendRequest).toContain('PLAYER');
     });
 
     test('Admin - ADMIN can manage users and venues', () => {
@@ -93,11 +93,11 @@ describe('RBAC - Role-Based Access Control', () => {
 
     test('PLAYER cannot access admin endpoints', () => {
       const adminUsers = permissions['GET /api/admin/users'];
-      const adminAnalytics = permissions['GET /api/admin/analytics'];
+      const adminStats = permissions['GET /api/admin/stats'];
       expect(adminUsers).not.toContain('PLAYER');
-      expect(adminAnalytics).not.toContain('PLAYER');
+      expect(adminStats).not.toContain('PLAYER');
       expect(adminUsers).toContain('ADMIN');
-      expect(adminAnalytics).toContain('ADMIN');
+      expect(adminStats).toContain('ADMIN');
     });
 
     test('PLAYER cannot approve venues', () => {
@@ -166,7 +166,7 @@ describe('RBAC - Role-Based Access Control', () => {
     test('Scenario 4: Player views venues but cannot create', () => {
       const viewVenues = permissions['GET /api/venues'];
       const createVenue = permissions['POST /api/venues'];
-      expect(viewVenues).toContain('PLAYER');
+      expect(viewVenues).toEqual([]);
       expect(createVenue).not.toContain('PLAYER');
     });
 

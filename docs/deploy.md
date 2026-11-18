@@ -56,6 +56,19 @@ $env:DATABASE_URL="<External Database URL>?sslmode=require"; npm run create-admi
   - Authorized redirect URIs: `<BACKEND_URL>/api/auth/google/callback`
 - SePay (https://my.sepay.vn) → Webhook: `<BACKEND_URL>/api/payments/sepay/webhook`, xác thực "API Key" = `SEPAY_WEBHOOK_API_KEY`.
 
+## 4. CI/CD
+
+`.github/workflows/ci.yml` chạy mỗi lần push / mở PR:
+
+| Job | Kiểm tra |
+|---|---|
+| Backend | Dựng PostgreSQL 16 + Redis tạm → `npm run migrate` trên CSDL trống → `migrate:validate` → `npm test` (Jest) → khởi động server và gọi `/health` |
+| Frontend | `npm run build` |
+
+Render → `sanbong-api` → Settings → **Auto-Deploy: After CI Checks Pass**: chỉ deploy khi CI xanh. Vercel vẫn tự deploy mỗi lần push (frontend đã được CI build thử).
+
+Quy ước CSDL: máy dev dùng CSDL Docker (`DATABASE_URL` trỏ `localhost:5433`), bản online dùng CSDL Render. Thay đổi cấu trúc đi bằng migration mới → push → CI → Render tự chạy `npm run migrate` khi khởi động. Không sửa tay CSDL Render.
+
 ## Email (OTP qua email, gửi báo cáo admin)
 
 Render free chặn cổng SMTP nên Gmail không gửi được. Server vẫn chạy bình thường, chỉ các chức năng gửi mail bị lỗi. Có ba cách:

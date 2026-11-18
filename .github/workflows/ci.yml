@@ -1,0 +1,85 @@
+# CI: chay moi lan push / mo PR. Render chi deploy khi CI xanh (Auto-Deploy: After CI Checks Pass).
+name: CI
+
+on:
+  push:
+    branches: [main, dev, 'feat/**', 'feature/**', 'fix/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (migration + test + khoi dong)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sanbong
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          TZ: Asia/Ho_Chi_Minh
+          PGTZ: Asia/Ho_Chi_Minh
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sanbong"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sanbong
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      TZ: Asia/Ho_Chi_Minh
+      NODE_ENV: test
+      PORT: '3000'
+      JWT_ACCESS_SECRET: ci-access-secret-chi-dung-de-kiem-thu
+      JWT_REFRESH_SECRET: ci-refresh-secret-chi-dung-de-kiem-thu
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # package-lock.json nam trong .gitignore -> dung npm install thay npm ci
+      - run: npm install --no-audit --no-fund
+      - name: Chay toan bo migration tren CSDL trong
+        run: npm run migrate
+      - name: Kiem tra checksum migration
+        run: npm run migrate:validate
+      - name: Unit test
+        run: npm test
+      - name: Khoi dong server va goi /health
+        run: |
+          node src/server.js > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "Server khong len sau 30 giay"; cat server.log; exit 1
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: https://sanbong-api.onrender.com
