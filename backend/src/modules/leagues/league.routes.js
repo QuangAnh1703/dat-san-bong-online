@@ -9,10 +9,11 @@ const league = require('../../services/tournament.service');
 // Elo, bang xep hang & giai dau (PRD 2.1.9). Gan tai /api.
 const router = express.Router();
 
+// Tieu chi chinh giam dan; bang diem thi xet tiep Elo, so tran thang, ten doi
 const SORTS = {
   elo: 't.elo DESC, t.wins DESC',
   wins: 't.wins DESC, t.elo DESC',
-  streak: 't.win_streak DESC, t.elo DESC',
+  streak: 't.win_streak DESC, t.wins DESC, t.elo DESC',
   reputation: 't.reputation_score DESC, t.elo DESC',
 };
 
@@ -26,7 +27,7 @@ router.get('/leaderboard', async (req, res, next) => {
               (t.wins + t.draws + t.losses) AS played
          FROM team t LEFT JOIN district d ON d.code = t.district_code
         WHERE ($1::text IS NULL OR t.district_code = $1)
-        ORDER BY (t.wins + t.draws + t.losses) > 0 DESC, ${SORTS[sort]}, t.id
+        ORDER BY ${SORTS[sort]}, t.name, t.id
         LIMIT 100`,
       [req.query.district || null]
     );
@@ -36,7 +37,7 @@ router.get('/leaderboard', async (req, res, next) => {
   }
 });
 
-// GET /api/matches/results/mine - tran cap keo cua doi minh can / da nhap ty so
+// GET /api/matches/results/mine - tran cap keo cua doi minh (cho chu san nhap / da chot ty so)
 router.get('/matches/results/mine', requireAuthenticated, async (req, res, next) => {
   try {
     const r = await query(
@@ -46,7 +47,8 @@ router.get('/matches/results/mine', requireAuthenticated, async (req, res, next)
               ht.id AS home_team_id, ht.name AS home_name, at.id AS away_team_id, at.name AS away_name,
               CASE WHEN ht.captain_id = $1 THEN 'home' ELSE 'away' END AS my_side,
               mr.status, mr.home_claim_home, mr.home_claim_away, mr.away_claim_home, mr.away_claim_away,
-              mr.dispute_due_at, mr.home_elo_delta, mr.away_elo_delta
+              mr.dispute_due_at, mr.home_elo_delta, mr.away_elo_delta,
+              mp.loser_percent, mp.deal_note, mr.total_amount, mr.home_amount, mr.away_amount
          FROM booking b
          JOIN venue v ON v.id = b.venue_id
          JOIN match_post mp ON mp.booking_id = b.id AND mp.type = 'TEAM_FINDS_TEAM' AND mp.status = 'MATCHED'
@@ -71,13 +73,23 @@ const score = (v, field) => {
   return n;
 };
 
-// POST /api/matches/:code/result  body: { home_score, away_score }
-router.post('/matches/:code/result', requireAuthenticated, async (req, res, next) => {
+// GET /api/matches/results/pending - tran cap keo da da xong tai san cua chu san, chua nhap ty so
+router.get('/matches/results/pending', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const data = await withTransaction((c) => league.listOwnerPendingResults(c, req.user));
+    res.json({ count: data.length, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/matches/:code/result  body: { home_score, away_score } - chu san nhap ty so, chot ngay
+router.post('/matches/:code/result', requireAuthenticated, requireRole('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     requireFields(req.body, ['home_score', 'away_score']);
     const h = score(req.body.home_score, 'home_score');
     const a = score(req.body.away_score, 'away_score');
-    res.json(await withTransaction((c) => league.submitResult(c, req.params.code, req.user, h, a)));
+    res.json(await withTransaction((c) => league.recordResult(c, req.params.code, req.user, h, a)));
   } catch (err) {
     next(err);
   }
@@ -214,13 +226,12 @@ router.post('/tournaments', requireAuthenticated, requireRole('OWNER', 'ADMIN'),
   }
 });
 
-// POST /api/tournaments/:id/register - doi truong dang ky; co le phi thi tra noi dung CK "GIAI <ma>"
+// POST /api/tournaments/:id/register - doi truong dang ky; giai co le phi -> PENDING_PAYMENT cho thu le phi
 router.post('/tournaments/:id/register', requireAuthenticated, async (req, res, next) => {
   try {
     const out = await withTransaction(async (c) => {
       const t = await c.query(
-        `SELECT t.*, v.bank_name, v.bank_account, v.bank_holder FROM tournament t JOIN venue v ON v.id = t.venue_id
-          WHERE t.id = $1 FOR UPDATE OF t`,
+        `SELECT t.* FROM tournament t WHERE t.id = $1 FOR UPDATE`,
         [Number(req.params.id)]
       );
       const tour = t.rows[0];
@@ -249,16 +260,6 @@ router.post('/tournaments/:id/register', requireAuthenticated, async (req, res, 
       return {
         status: reg.status,
         fee_code: reg.fee_code,
-        transfer:
-          reg.status === 'PENDING_PAYMENT'
-            ? {
-                bank_name: tour.bank_name,
-                bank_account: tour.bank_account,
-                bank_holder: tour.bank_holder,
-                amount: Number(tour.fee),
-                content: `GIAI ${reg.fee_code}`,
-              }
-            : null,
       };
     });
     res.status(201).json(out);

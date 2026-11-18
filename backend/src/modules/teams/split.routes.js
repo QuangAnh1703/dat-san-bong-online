@@ -18,6 +18,7 @@ async function loadBooking(c, code, lock = false) {
     `SELECT b.id, b.code, b.status, b.user_id, b.team_id, b.total_amount,
             (SELECT min(lower(s.time_range)) FROM booking_slot s WHERE s.booking_id = b.id) AS starts_at,
             (SELECT COALESCE(sum(o.total), 0) FROM service_order o WHERE o.booking_id = b.id) AS pos_total,
+            (SELECT mr.home_amount FROM match_result mr WHERE mr.booking_id = b.id AND mr.status = 'CONFIRMED') AS match_share,
             v.name AS venue_name
        FROM booking b JOIN venue v ON v.id = b.venue_id
       WHERE b.code = $1 ${lock ? 'FOR UPDATE OF b' : ''}`,
@@ -31,6 +32,9 @@ async function myPhone(c, userId) {
   const r = await c.query(`SELECT phone FROM app_user WHERE id = $1`, [userId]);
   return r.rows[0]?.phone || null;
 }
+
+// Tran cap keo da chot ty so: doi chu nha (nguoi dat san) chi chia phan minh chiu theo keo
+const billTotal = (b) => (b.match_share === null ? Number(b.total_amount) + Number(b.pos_total) : Number(b.match_share));
 
 // Doi truong = nguoi dat don
 function assertCaptain(booking, user) {
@@ -97,7 +101,8 @@ router.get('/booking/:code', async (req, res, next) => {
         status: b.status,
         venue_name: b.venue_name,
         starts_at: b.starts_at,
-        total: Number(b.total_amount) + Number(b.pos_total),
+        total: billTotal(b),
+        match_settled: b.match_share !== null,
       },
       is_captain: isCaptain,
       my_phone: phone,
@@ -131,7 +136,8 @@ router.get('/booking/:code/candidates', async (req, res, next) => {
       [req.user.id]
     );
     res.json({
-      total: Number(b.total_amount) + Number(b.pos_total),
+      total: billTotal(b),
+      match_settled: b.match_share !== null,
       field_and_online_services: Number(b.total_amount),
       pos_services: Number(b.pos_total),
       starts_at: b.starts_at,
@@ -176,7 +182,8 @@ router.post('/booking/:code', async (req, res, next) => {
       const exists = await c.query(`SELECT 1 FROM split_bill WHERE booking_id = $1`, [b.id]);
       if (exists.rowCount > 0) throw new AppError('SPLIT_EXISTS');
 
-      const total = Number(b.total_amount) + Number(b.pos_total);
+      const total = billTotal(b);
+      if (total <= 0) throw new AppError('INVALID_STATUS', { message: 'Theo kèo, đội bạn không phải trả tiền sân trận này' });
       const { amounts, sponsor, surplus } = split.computeShares({ mode: body.mode, total, sponsorPercent, members });
       const team = await c.query(`SELECT id FROM team WHERE captain_id = $1`, [req.user.id]);
       // Han nhac no tinh tu gio bong lan; tran da qua gio thi han = bay gio + 1 ngay

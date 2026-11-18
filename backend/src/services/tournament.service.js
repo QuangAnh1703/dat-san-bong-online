@@ -4,7 +4,8 @@ const { AppError } = require('../lib/errors');
 
 // Elo, bang xep hang & giai dau phong trao (PRD 2.1.9)
 
-const DISPUTE_HOURS = 12;
+const RESULT_PROMPT_MIN = 10;
+const LOSER_PERCENTS = [50, 60, 70, 100];
 const FORFEIT_REPUTATION = 20;
 const BAN_DAYS = 30;
 const SLOT_STEP_MIN = 30;
@@ -18,6 +19,19 @@ async function notify(c, userId, type, title, body, refKind = null, refId = null
     `INSERT INTO notification (user_id, type, title, body, ref_kind, ref_id) VALUES ($1, $2, $3, $4, $5, $6)`,
     [userId, type, title, body, refKind, refId]
   );
+}
+
+// Kèo thống nhất trước trận: đội thua chịu loserPercent% tổng chi phí, hòa thì chia đôi
+const dealNote = (p) =>
+  p === 50 ? 'Chia đôi tiền sân 50/50' : p === 100 ? 'Thua trả 100% tiền sân' : `Thua trả ${p}%, thắng trả ${100 - p}% tiền sân`;
+
+function settleAmounts(total, homeGoals, awayGoals, loserPercent) {
+  const t = Math.round(Number(total));
+  if (homeGoals === awayGoals) return { loserPercent: 50, home: Math.round(t / 2), away: t - Math.round(t / 2) };
+  const loser = Math.round((t * loserPercent) / 100);
+  return homeGoals > awayGoals
+    ? { loserPercent, home: t - loser, away: loser }
+    : { loserPercent, home: loser, away: t - loser };
 }
 
 // ---------------------------------------------------------------- Elo
@@ -57,11 +71,13 @@ async function applyElo(c, homeId, awayId, hg, ag) {
 // Tran cap keo da chot: doi nha = doi dat san, doi khach = doi duoc chap nhan
 async function loadChallenge(c, bookingCode, lock = false) {
   const r = await c.query(
-    `SELECT b.id AS booking_id, b.code, b.status,
+    `SELECT b.id AS booking_id, b.code, b.status, mp.loser_percent,
+            b.total_amount + COALESCE((SELECT sum(o.total) FROM service_order o WHERE o.booking_id = b.id), 0) AS total_cost,
             (SELECT max(upper(s.time_range)) FROM booking_slot s WHERE s.booking_id = b.id) AS ends_at,
             ht.id AS home_team_id, ht.name AS home_name, ht.captain_id AS home_captain,
-            at.id AS away_team_id, at.name AS away_name, at.captain_id AS away_captain
+            at.id AS away_team_id, at.name AS away_name, at.captain_id AS away_captain, v.owner_id
        FROM booking b
+       JOIN venue v ON v.id = b.venue_id
        JOIN match_post mp ON mp.booking_id = b.id AND mp.type = 'TEAM_FINDS_TEAM' AND mp.status = 'MATCHED'
        JOIN team ht ON ht.id = mp.team_id
        JOIN join_request jr ON jr.post_id = mp.id AND jr.status = 'ACCEPTED' AND jr.requester_team_id IS NOT NULL
@@ -72,15 +88,41 @@ async function loadChallenge(c, bookingCode, lock = false) {
   return r.rows[0] || null;
 }
 
+const PLAYED_STATUSES = ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'];
+
+// Tran cap keo da da xong tai san cua chu san, chua co ket qua chot (ADMIN thay tat ca san)
+async function listOwnerPendingResults(c, user) {
+  const r = await c.query(
+    `SELECT b.code, v.name AS venue_name, e.starts_at, e.ends_at, ht.name AS home_name, at.name AS away_name,
+            mp.loser_percent
+       FROM booking b
+       JOIN venue v ON v.id = b.venue_id
+       JOIN match_post mp ON mp.booking_id = b.id AND mp.type = 'TEAM_FINDS_TEAM' AND mp.status = 'MATCHED'
+       JOIN team ht ON ht.id = mp.team_id
+       JOIN join_request jr ON jr.post_id = mp.id AND jr.status = 'ACCEPTED' AND jr.requester_team_id IS NOT NULL
+       JOIN team at ON at.id = jr.requester_team_id
+       CROSS JOIN LATERAL (SELECT min(lower(s.time_range)) AS starts_at, max(upper(s.time_range)) AS ends_at
+                             FROM booking_slot s WHERE s.booking_id = b.id) e
+      WHERE b.status = ANY($3) AND e.ends_at <= now() AND e.ends_at > now() - interval '14 days'
+        AND ($2 OR v.owner_id = $1)
+        AND NOT EXISTS (SELECT 1 FROM match_result mr WHERE mr.booking_id = b.id AND mr.status = 'CONFIRMED')
+      ORDER BY e.ends_at DESC LIMIT 50`,
+    [user.id, user.role === 'ADMIN', PLAYED_STATUSES]
+  );
+  return r.rows;
+}
+
 /**
- * Doi truong nhap ty so. Hai ben khop -> tinh Elo; lech -> "Xung dot ket qua", 12 tieng de sua.
+ * Chu san nhap ty so tran cap keo -> chot ngay: tinh Elo, chia tien san theo keo, bao 2 doi truong.
+ * Ty so ghi vao ca hai cot claim de man hinh nguoi choi doc nhu truoc.
  */
-async function submitResult(c, bookingCode, user, homeScore, awayScore) {
+async function recordResult(c, bookingCode, user, hg, ag) {
   const m = await loadChallenge(c, bookingCode, true);
   if (!m) throw new AppError('NOT_FOUND', { message: 'Không phải trận cáp kèo đã chốt đối' });
-  const side = m.home_captain === user.id ? 'home' : m.away_captain === user.id ? 'away' : null;
-  if (!side) throw new AppError('FORBIDDEN', { message: 'Chỉ đội trưởng hai đội được nhập tỷ số' });
-  if (!['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(m.status) || new Date(m.ends_at) > new Date()) {
+  if (user.role !== 'ADMIN' && m.owner_id !== user.id) {
+    throw new AppError('FORBIDDEN', { message: 'Chỉ chủ sân nơi diễn ra trận được nhập tỷ số' });
+  }
+  if (!PLAYED_STATUSES.includes(m.status) || new Date(m.ends_at) > new Date()) {
     throw new AppError('INVALID_STATUS', { message: 'Trận chưa kết thúc' });
   }
 
@@ -90,68 +132,69 @@ async function submitResult(c, bookingCode, user, homeScore, awayScore) {
     [m.booking_id, m.home_team_id, m.away_team_id]
   );
   const cur = (await c.query(`SELECT * FROM match_result WHERE booking_id = $1 FOR UPDATE`, [m.booking_id])).rows[0];
-  if (['CONFIRMED', 'VOID'].includes(cur.status)) {
-    throw new AppError('INVALID_STATUS', { message: cur.status === 'VOID' ? 'Đã quá hạn thống nhất kết quả' : 'Kết quả đã được chốt' });
-  }
-  const cols = side === 'home' ? ['home_claim_home', 'home_claim_away'] : ['away_claim_home', 'away_claim_away'];
-  const r = (
-    await c.query(`UPDATE match_result SET ${cols[0]} = $2, ${cols[1]} = $3, updated_at = now() WHERE id = $1 RETURNING *`, [
-      cur.id,
-      homeScore,
-      awayScore,
-    ])
-  ).rows[0];
+  if (cur.status === 'CONFIRMED') throw new AppError('INVALID_STATUS', { message: 'Kết quả đã được chốt' });
 
-  const both = r.home_claim_home !== null && r.away_claim_home !== null;
-  if (!both) {
-    const other = side === 'home' ? m.away_captain : m.home_captain;
-    await notify(c, other, 'MATCH_RESULT_REQUEST', `Xác nhận tỷ số trận ${m.code}`, `${side === 'home' ? m.home_name : m.away_name} nhập ${m.home_name} ${homeScore}-${awayScore} ${m.away_name}. Vào Lịch của tôi để xác nhận.`, 'BOOKING', m.booking_id);
-    return { status: 'PENDING', result: r };
-  }
-  if (r.home_claim_home === r.away_claim_home && r.home_claim_away === r.away_claim_away) {
-    const d = await applyElo(c, m.home_team_id, m.away_team_id, r.home_claim_home, r.home_claim_away);
-    const done = (
-      await c.query(
-        `UPDATE match_result SET status = 'CONFIRMED', home_elo_delta = $2, away_elo_delta = $3, confirmed_at = now(),
-                                 dispute_due_at = NULL
-          WHERE id = $1 RETURNING *`,
-        [r.id, d.home, d.away]
-      )
-    ).rows[0];
-    for (const [cap, delta] of [[m.home_captain, d.home], [m.away_captain, d.away]]) {
-      await notify(c, cap, 'MATCH_RESULT_CONFIRMED', `Kết quả trận ${m.code} đã chốt`, `${m.home_name} ${r.home_claim_home}-${r.home_claim_away} ${m.away_name}. Elo đội bạn ${delta >= 0 ? '+' : ''}${delta}.`, 'BOOKING', m.booking_id);
-    }
-    return { status: 'CONFIRMED', result: done };
-  }
-  const disp = (
+  const d = await applyElo(c, m.home_team_id, m.away_team_id, hg, ag);
+  const pay = settleAmounts(m.total_cost, hg, ag, m.loser_percent);
+  const done = (
     await c.query(
-      `UPDATE match_result SET status = 'DISPUTED',
-              dispute_due_at = COALESCE(dispute_due_at, now() + make_interval(hours => $2))
+      `UPDATE match_result SET status = 'CONFIRMED', home_claim_home = $2, home_claim_away = $3,
+                               away_claim_home = $2, away_claim_away = $3, home_elo_delta = $4, away_elo_delta = $5,
+                               confirmed_at = now(), dispute_due_at = NULL, loser_percent = $6, total_amount = $7,
+                               home_amount = $8, away_amount = $9, recorded_by = $10, updated_at = now()
         WHERE id = $1 RETURNING *`,
-      [r.id, DISPUTE_HOURS]
+      [cur.id, hg, ag, d.home, d.away, pay.loserPercent, Number(m.total_cost), pay.home, pay.away, user.id]
     )
   ).rows[0];
-  for (const cap of [m.home_captain, m.away_captain]) {
-    await notify(c, cap, 'MATCH_RESULT_DISPUTED', `Xung đột kết quả trận ${m.code}`, `Hai đội nhập tỷ số khác nhau. Cập nhật lại trong ${DISPUTE_HOURS} tiếng, quá hạn trận không được tính Elo.`, 'BOOKING', m.booking_id);
+  const score = `${m.home_name} ${hg}-${ag} ${m.away_name}`;
+  const rule = hg === ag ? 'hòa chia đôi' : `kèo thua trả ${pay.loserPercent}%`;
+  for (const [cap, delta, amount] of [[m.home_captain, d.home, pay.home], [m.away_captain, d.away, pay.away]]) {
+    await notify(c, cap, 'MATCH_RESULT_CONFIRMED', `Kết quả trận ${m.code} đã chốt`, `Chủ sân nhập tỷ số ${score}. Elo ${delta >= 0 ? '+' : ''}${delta}. Theo ${rule}, đội bạn chịu ${vnd(amount)} tiền sân.`, 'BOOKING', m.booking_id);
   }
-  return { status: 'DISPUTED', result: disp };
+  return { status: 'CONFIRMED', result: done };
 }
 
-// Job nen: xung dot qua 12 tieng -> khong tinh Elo
-async function voidExpiredDisputes(c) {
-  const r = await c.query(
-    `UPDATE match_result mr SET status = 'VOID', updated_at = now()
+/**
+ * Job nen: sau khi tran ket thuc RESULT_PROMPT_MIN phut, nhac chu san nhap ty so (tran cap keo chua chot)
+ * va nhac BTC nhap ket qua (tran giai chua co ty so). Moi tran chi nhac mot lan; bo qua tran da qua > 14 ngay.
+ */
+async function remindMatchResults(c) {
+  const challenges = await c.query(
+    `SELECT b.id AS booking_id, b.code, v.owner_id, ht.name AS home_name, at.name AS away_name
        FROM booking b
-      WHERE b.id = mr.booking_id AND mr.status = 'DISPUTED' AND mr.dispute_due_at < now()
-      RETURNING mr.booking_id, b.code, mr.home_team_id, mr.away_team_id`
+       JOIN venue v ON v.id = b.venue_id
+       JOIN match_post mp ON mp.booking_id = b.id AND mp.type = 'TEAM_FINDS_TEAM' AND mp.status = 'MATCHED'
+       JOIN team ht ON ht.id = mp.team_id
+       JOIN join_request jr ON jr.post_id = mp.id AND jr.status = 'ACCEPTED' AND jr.requester_team_id IS NOT NULL
+       JOIN team at ON at.id = jr.requester_team_id
+       CROSS JOIN LATERAL (SELECT max(upper(s.time_range)) AS ends_at FROM booking_slot s
+                            WHERE s.booking_id = b.id AND s.status <> 'RELEASED') e
+      WHERE b.status = ANY($2)
+        AND e.ends_at <= now() - make_interval(mins => $1) AND e.ends_at > now() - interval '14 days'
+        AND NOT EXISTS (SELECT 1 FROM match_result mr WHERE mr.booking_id = b.id AND mr.status = 'CONFIRMED')
+        AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.type = 'MATCH_RESULT_OWNER_DUE' AND n.ref_id = b.id)`,
+    [RESULT_PROMPT_MIN, PLAYED_STATUSES]
   );
-  for (const row of r.rows) {
-    const caps = await c.query(`SELECT captain_id FROM team WHERE id = ANY($1)`, [[row.home_team_id, row.away_team_id]]);
-    for (const cap of caps.rows) {
-      await notify(c, cap.captain_id, 'MATCH_RESULT_VOID', `Trận ${row.code} không được tính Elo`, `Hai đội không thống nhất kết quả trong ${DISPUTE_HOURS} tiếng.`, 'BOOKING', row.booking_id);
-    }
+  for (const m of challenges.rows) {
+    await notify(c, m.owner_id, 'MATCH_RESULT_OWNER_DUE', `Nhập tỷ số trận ${m.code}`, `${m.home_name} vs ${m.away_name} đã kết thúc. Nhập tỷ số để tính điểm Elo và chia tiền sân.`, 'BOOKING', m.booking_id);
   }
-  return r.rowCount;
+
+  const tournaments = await c.query(
+    `SELECT m.id, m.booking_id, t.organizer_id, t.name AS tournament_name, h.name AS home_name, a.name AS away_name
+       FROM tournament_match m
+       JOIN tournament t ON t.id = m.tournament_id
+       JOIN team h ON h.id = m.home_team_id
+       JOIN team a ON a.id = m.away_team_id
+      WHERE m.status = 'SCHEDULED' AND m.booking_id IS NOT NULL
+        AND m.starts_at + make_interval(mins => t.match_minutes + $1) <= now()
+        AND m.starts_at > now() - interval '14 days'
+        AND NOT EXISTS (SELECT 1 FROM notification n WHERE n.type = 'TOURNAMENT_RESULT_DUE' AND n.ref_id = m.booking_id)`,
+    [RESULT_PROMPT_MIN]
+  );
+  for (const m of tournaments.rows) {
+    await notify(c, m.organizer_id, 'TOURNAMENT_RESULT_DUE', `Nhập kết quả ${m.home_name} vs ${m.away_name}`, `Trận thuộc giải ${m.tournament_name} đã kết thúc, hãy cập nhật tỷ số.`, 'BOOKING', m.booking_id);
+  }
+  return challenges.rowCount + tournaments.rowCount;
 }
 
 // ---------------------------------------------------------------- Giai dau
@@ -164,56 +207,6 @@ function makeFeeCode() {
 async function registeredCount(c, tournamentId) {
   const r = await c.query(`SELECT count(*) AS n FROM tournament_team WHERE tournament_id = $1 AND status = 'REGISTERED'`, [tournamentId]);
   return Number(r.rows[0].n);
-}
-
-// Khop chuyen khoan "GIAI <ma>" -> doi da dong le phi
-async function applyFee(c, txn, code) {
-  const r = await c.query(
-    `SELECT tt.*, x.name AS tournament_name, x.fee, x.max_teams, x.status AS t_status, x.organizer_id,
-            v.bank_account, tm.name AS team_name, tm.captain_id
-       FROM tournament_team tt JOIN tournament x ON x.id = tt.tournament_id JOIN venue v ON v.id = x.venue_id
-       JOIN team tm ON tm.id = tt.team_id
-      WHERE tt.fee_code = $1 FOR UPDATE OF tt`,
-    [code]
-  );
-  const t = r.rows[0];
-  const setTxn = (status, note) =>
-    c.query(`UPDATE bank_transaction SET status = $2, tournament_id = $3, team_id = $4, note = $5 WHERE id = $1`, [
-      txn.id,
-      status,
-      t ? t.tournament_id : null,
-      t ? t.team_id : null,
-      note || null,
-    ]);
-  if (!t) {
-    await setTxn('UNMATCHED', `Không tìm thấy mã đăng ký giải ${code}`);
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (txn.account_number && t.bank_account && digits(txn.account_number) !== digits(t.bank_account)) {
-    await setTxn('UNMATCHED', 'Tài khoản nhận không khớp tài khoản cụm sân');
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (t.status !== 'PENDING_PAYMENT') {
-    await setTxn('UNMATCHED', 'Đội đã đóng lệ phí trước đó');
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (Number(txn.amount) < Number(t.fee)) {
-    await setTxn('UNMATCHED', `Chuyển thiếu: lệ phí ${vnd(t.fee)}`);
-    return { result: 'underpaid', transaction_id: txn.id };
-  }
-  if (t.t_status !== 'OPEN' || (await registeredCount(c, t.tournament_id)) >= t.max_teams) {
-    await setTxn('REFUND_PENDING', 'Giải đã đủ đội / đã đóng đăng ký');
-    await notify(c, t.captain_id, 'TOURNAMENT_FULL', `Giải ${t.tournament_name} đã đủ đội`, `Lệ phí ${vnd(txn.amount)} sẽ được hoàn trả.`);
-    return { result: 'refund_pending', transaction_id: txn.id };
-  }
-  await c.query(`UPDATE tournament_team SET status = 'REGISTERED', paid_at = now() WHERE tournament_id = $1 AND team_id = $2`, [
-    t.tournament_id,
-    t.team_id,
-  ]);
-  await setTxn('APPLIED');
-  await notify(c, t.captain_id, 'TOURNAMENT_REGISTERED', `Đăng ký giải ${t.tournament_name} thành công`, `Đã nhận lệ phí ${vnd(txn.amount)}. Lịch thi đấu sẽ được thông báo khi BTC xếp lịch.`);
-  await notify(c, t.organizer_id, 'TOURNAMENT_TEAM_PAID', `${t.team_name} đã đóng lệ phí`, `Giải ${t.tournament_name}.`);
-  return { result: 'confirmed', transaction_id: txn.id };
 }
 
 // Vong tron (circle method): moi cap gap nhau mot lan
@@ -503,12 +496,15 @@ function standings(teams, matches) {
 
 module.exports = {
   eloDeltas,
+  LOSER_PERCENTS,
+  dealNote,
+  settleAmounts,
+  remindMatchResults,
   loadChallenge,
-  submitResult,
-  voidExpiredDisputes,
+  listOwnerPendingResults,
+  recordResult,
   makeFeeCode,
   registeredCount,
-  applyFee,
   schedule,
   recordMatchResult,
   forfeit,

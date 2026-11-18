@@ -50,6 +50,7 @@ const ERRORS = {
   USER_NOT_FOUND: { status: 404, message: 'Khong tim thay nguoi dung' },
   POST_NOT_FOUND: { status: 404, message: 'Khong tim thay bai dang' },
   REQUEST_NOT_FOUND: { status: 404, message: 'Khong tim thay loi moi' },
+  KB_ARTICLE_NOT_FOUND: { status: 404, message: 'Không tìm thấy bài viết trong kho tri thức' },
   TICKET_NOT_FOUND: { status: 404, message: 'Khong tim thay khieu nai' },
   TRANSACTION_NOT_FOUND: { status: 404, message: 'Không tìm thấy giao dịch chuyển khoản' },
   OWNER_REQUEST_NOT_FOUND: { status: 404, message: 'Khong tim thay yeu cau chu san' },
@@ -94,6 +95,7 @@ const ERRORS = {
 
   // --- 429 Rate limit ---
   OTP_RATE_LIMITED: { status: 429, message: 'Đã nhập sai quá nhiều lần. Tạm khóa gửi OTP 15 phút' },
+  CHATBOT_RATE_LIMITED: { status: 429, message: 'Bạn hỏi trợ lý hơi nhiều, vui lòng thử lại sau ít phút' },
   OWNER_HAS_UPCOMING_BOOKINGS: { status: 409, message: 'Chủ sân đang có đơn đặt chưa diễn ra' },
 
   // --- 5xx ---
@@ -101,6 +103,8 @@ const ERRORS = {
   INTERNAL_ERROR: { status: 500, message: 'Loi may chu' },
   NOT_IMPLEMENTED: { status: 501, message: 'Chuc nang chua duoc trien khai' },
   PAYMENT_GATEWAY_NOT_CONFIGURED: { status: 503, message: 'Cổng thanh toán chưa được cấu hình' },
+  CHATBOT_NOT_CONFIGURED: { status: 503, message: 'Trợ lý đặt sân chưa được cấu hình' },
+  CHATBOT_UNAVAILABLE: { status: 502, message: 'Trợ lý đặt sân đang bận, vui lòng thử lại sau' },
   GOOGLE_OAUTH_NOT_CONFIGURED: { status: 503, message: 'Dang nhap Google chua duoc cau hinh' },
 };
 
@@ -157,6 +161,15 @@ function fromDbError(err) {
       return new AppError('VALIDATION_ERROR', {
         message: 'Du lieu tham chieu toi ban ghi khong ton tai',
         details: { constraint: err.constraint },
+        cause: err,
+      });
+    // Tham so sai dinh dang (id "abc" -> NaN, ngay 2026-13-45, gio "xx") lot xuong CSDL: loi cua client, khong phai 500
+    case '22P02': // invalid_text_representation
+    case '22007': // invalid_datetime_format
+    case '22008': // datetime_field_overflow
+    case '22003': // numeric_value_out_of_range
+      return new AppError('VALIDATION_ERROR', {
+        message: 'Tham số không đúng định dạng (số, ngày YYYY-MM-DD hoặc giờ HH:MM)',
         cause: err,
       });
     case 'ECONNREFUSED':

@@ -80,58 +80,6 @@ async function markSharePaid(c, shareId, status = 'PAID') {
   return r.rows[0];
 }
 
-const digits = (s) => String(s || '').replace(/\D/g, '');
-
-/**
- * Khop chuyen khoan "QUY <ma tran> <SDT>" vao phan cua thanh vien (goi tu bank-match, trong transaction).
- */
-async function applyShareTransfer(c, txn, bookingCode, phone) {
-  const r = await c.query(
-    `SELECT s.id, s.amount, s.status, s.name, sb.id AS bill_id, sb.bank_account, sb.captain_id, sb.booking_id
-       FROM split_bill_share s
-       JOIN split_bill sb ON sb.id = s.split_bill_id
-       JOIN booking b ON b.id = sb.booking_id
-      WHERE b.code = $1 AND s.phone = $2 AND s.status <> 'REASSIGNED'
-      FOR UPDATE OF s`,
-    [bookingCode, phone]
-  );
-  const share = r.rows[0];
-  const setTxn = (status, note) =>
-    c.query(`UPDATE bank_transaction SET status = $2, split_share_id = $3, note = $4 WHERE id = $1`, [
-      txn.id,
-      status,
-      share ? share.id : null,
-      note || null,
-    ]);
-  if (!share) {
-    await setTxn('UNMATCHED', `Không tìm thấy phần chia tiền ${bookingCode} / ${phone}`);
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (txn.account_number && digits(txn.account_number) !== digits(share.bank_account)) {
-    await setTxn('UNMATCHED', 'Tài khoản nhận không khớp tài khoản đội trưởng');
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (share.status !== 'UNPAID') {
-    await setTxn('UNMATCHED', 'Thành viên đã đóng trước đó');
-    return { result: 'unmatched', transaction_id: txn.id };
-  }
-  if (Number(txn.amount) < Number(share.amount)) {
-    await setTxn('UNMATCHED', `Chuyển thiếu: cần ${vnd(share.amount)}`);
-    await notify(
-      c,
-      share.captain_id,
-      'SPLIT_UNDERPAID',
-      `${share.name} chuyển thiếu tiền quỹ`,
-      `Nhận ${vnd(txn.amount)}/${vnd(share.amount)}. Kiểm tra và xác nhận tay nếu đã thu đủ.`,
-      share.booking_id
-    );
-    return { result: 'underpaid', transaction_id: txn.id };
-  }
-  await setTxn('APPLIED');
-  await markSharePaid(c, share.id);
-  await notify(c, share.captain_id, 'SPLIT_PAID', `${share.name} đã đóng tiền trận`, `Nhận ${vnd(txn.amount)} qua chuyển khoản.`, share.booking_id);
-  return { result: 'confirmed', transaction_id: txn.id };
-}
 
 // Job nen: qua han nhac no -> nhac thanh vien chua dong (moi phan mot lan) + bao doi truong
 async function remindOverdue(c) {
@@ -168,4 +116,4 @@ async function remindOverdue(c) {
   return r.rowCount;
 }
 
-module.exports = { computeShares, settleIfDone, markSharePaid, applyShareTransfer, remindOverdue, notify, vnd };
+module.exports = { computeShares, settleIfDone, markSharePaid, remindOverdue, notify, vnd };

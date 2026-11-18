@@ -6,6 +6,7 @@ const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
 const { quoteSlot } = require('../../services/pricing.service');
 const { takeStock } = require('../../services/inventory.service');
+const { LOSER_PERCENTS, dealNote } = require('../../services/tournament.service');
 const router = express.Router();
 
 const HOLD_MINUTES = Number(process.env.HOLD_MINUTES || 15);
@@ -154,7 +155,7 @@ router.get('/', requireAuthenticated, async (req, res, next) => {
 
 // POST /api/bookings
 // body: { field_id, play_date, start, end, guest_name?, guest_phone?, note?,
-//         service_ids? | services?: [{ id, quantity }], pay_full?, looking_for_rival?, deal_note? }
+//         service_ids? | services?: [{ id, quantity }], pay_full?, looking_for_rival?, loser_percent? (50|60|70|100) }
 router.post('/', requireAuthenticated, async (req, res, next) => {
   const {
     field_id,
@@ -168,7 +169,7 @@ router.post('/', requireAuthenticated, async (req, res, next) => {
     services: serviceItems,
     pay_full = false,
     looking_for_rival = false,
-    deal_note,
+    loser_percent,
   } = req.body || {};
   const userId = req.user.id;
 
@@ -195,6 +196,10 @@ router.post('/', requireAuthenticated, async (req, res, next) => {
       const servicesTotal = services.reduce((s, x) => s + Number(x.price) * x.quantity, 0);
 
       let team = null;
+      const loserPercent = loser_percent === undefined ? 50 : Number(loser_percent);
+      if (!LOSER_PERCENTS.includes(loserPercent)) {
+        throw new AppError('INVALID_FIELD', { details: { field: 'loser_percent', allowed: LOSER_PERCENTS } });
+      }
       if (looking_for_rival) {
         // PRD 1.5: phai con it nhat 30 phut truoc gio da moi tim doi giao huu
         const soon = await c.query(`SELECT ($1 || ' ' || $2)::timestamptz < now() + interval '30 minutes' AS soon`, [
@@ -208,7 +213,8 @@ router.post('/', requireAuthenticated, async (req, res, next) => {
       }
 
       const total = quote.amount + servicesTotal;
-      const deposit = pay_full ? total : Math.round(total * Number(field.deposit_rate));
+      // Tran tim doi: chi dat coc, phan con lai chia theo ty so sau tran
+      const deposit = pay_full && !looking_for_rival ? total : Math.round(total * Number(field.deposit_rate));
 
       const b = await c.query(
         `INSERT INTO booking (code, kind, status, venue_id, user_id, team_id,
@@ -257,9 +263,9 @@ router.post('/', requireAuthenticated, async (req, res, next) => {
       if (team) {
         const p = await c.query(
           `INSERT INTO match_post (type, booking_id, author_user_id, team_id, district_code, play_date,
-                                   time_span, required_level, deal_note, content, expires_at)
-           VALUES ('TEAM_FINDS_TEAM', $1, $2, $3, $4, $5::date, int4range($6, $7), $8, $9, $10,
-                   ($5 || ' ' || $11)::timestamptz)
+                                   time_span, required_level, deal_note, loser_percent, content, expires_at)
+           VALUES ('TEAM_FINDS_TEAM', $1, $2, $3, $4, $5::date, int4range($6, $7), $8, $9, $10, $11,
+                   ($5 || ' ' || $12)::timestamptz)
            RETURNING id`,
           [
             booking.id,
@@ -270,7 +276,8 @@ router.post('/', requireAuthenticated, async (req, res, next) => {
             toMinutes(start),
             toMinutes(end),
             team.skill_level,
-            deal_note || 'Chia đôi tiền sân',
+            dealNote(loserPercent),
+            loserPercent,
             note || null,
             start,
           ]

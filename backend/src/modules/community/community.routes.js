@@ -6,6 +6,7 @@ const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
 const repo = require('./community.repository');
 const { notify } = require('./freelance.repository');
+const { LOSER_PERCENTS, dealNote } = require('../../services/tournament.service');
 
 // PRD 1.5: phai con it nhat 30 phut truoc gio da moi duoc dang tim doi
 const MIN_MINUTES_BEFORE_MATCH = 30;
@@ -56,7 +57,7 @@ router.post(
   requireAuthenticated,
   requireRole('PLAYER', 'OWNER', 'ADMIN'),
   async (req, res, next) => {
-    const { type, booking_id, required_level, deal_note, slots_needed, cost_kind, cost_amount, content } =
+    const { type, booking_id, required_level, loser_percent, slots_needed, cost_kind, cost_amount, content } =
       req.body;
     let { team_id, district_code, play_date, time_span, expires_at } = req.body;
 
@@ -65,6 +66,11 @@ router.post(
 
       if (!['TEAM_FINDS_TEAM', 'TEAM_FINDS_PLAYER', 'PLAYER_FINDS_TEAM'].includes(type)) {
         throw new AppError('INVALID_FIELD', { details: { field: 'type' } });
+      }
+
+      const loserPercent = loser_percent === undefined ? 50 : Number(loser_percent);
+      if (!LOSER_PERCENTS.includes(loserPercent)) {
+        throw new AppError('INVALID_FIELD', { details: { field: 'loser_percent', allowed: LOSER_PERCENTS } });
       }
 
       let teamLevel = null;
@@ -119,7 +125,8 @@ router.post(
         play_date,
         time_span: time_span || null,
         required_level: required_level || teamLevel || 'INTERMEDIATE',
-        deal_note: deal_note || null,
+        deal_note: type === 'TEAM_FINDS_TEAM' ? dealNote(loserPercent) : null,
+        loser_percent: loserPercent,
         slots_needed: slots_needed || null,
         cost_kind: cost_kind || null,
         cost_amount: cost_amount || null,

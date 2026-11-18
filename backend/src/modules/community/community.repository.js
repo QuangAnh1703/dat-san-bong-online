@@ -11,6 +11,7 @@ async function createPost({
   time_span,
   required_level,
   deal_note,
+  loser_percent,
   slots_needed,
   cost_kind,
   cost_amount,
@@ -20,9 +21,9 @@ async function createPost({
   const result = await query(
     `INSERT INTO match_post (
       type, author_user_id, team_id, booking_id, district_code, play_date,
-      time_span, required_level, deal_note, slots_needed, cost_kind,
+      time_span, required_level, deal_note, loser_percent, slots_needed, cost_kind,
       cost_amount, content, expires_at, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now())
     RETURNING *`,
     [
       type,
@@ -34,6 +35,7 @@ async function createPost({
       time_span,
       required_level,
       deal_note,
+      loser_percent,
       slots_needed,
       cost_kind,
       cost_amount,

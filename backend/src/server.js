@@ -13,11 +13,10 @@ const { verifyAccessToken, requireAuthenticated } = require('./middlewares/auth'
 const { checkPermission } = require('./middlewares/rbac');
 const routes = require('./routes');
 const { expireFreelance } = require('./modules/community/freelance.repository');
-const { flagRefundsForCancelled } = require('./services/bank-match.service');
 const { restockCancelled } = require('./services/inventory.service');
 const { remindOverdue } = require('./services/split.service');
 const { refundCancelledWalletPayments } = require('./services/wallet.service');
-const { voidExpiredDisputes } = require('./services/tournament.service');
+const { remindMatchResults } = require('./services/tournament.service');
 
 // Don da xac nhan va moi khung gio da qua -> COMPLETED, cong so tran cho nguoi dat va nguoi tham gia
 async function completeFinishedBookings(db) {
@@ -107,11 +106,10 @@ const PORT = Number(process.env.PORT || 3000);
             AND b.status::text LIKE 'CANCELLED%'`
       );
       await expireFreelance(pool);
-      await withTransaction(flagRefundsForCancelled);
       await withTransaction(restockCancelled);
       await withTransaction(remindOverdue);
       await withTransaction(refundCancelledWalletPayments);
-      await withTransaction(voidExpiredDisputes);
+      await withTransaction(remindMatchResults);
       await completeFinishedBookings(pool);
       if (r.rows[0].released > 0) console.log('[hold] nha %d slot qua han', r.rows[0].released);
     } catch (err) {

@@ -26,12 +26,17 @@ function listMigrationFiles() {
       if (!m) return null;
       const fullPath = path.join(MIGRATION_DIR, filename);
       const content = fs.readFileSync(fullPath, 'utf8');
+      const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+      const lf = content.replace(/\r\n/g, '\n');
       return {
         version: m[1],
         description: m[2].replace(/_/g, ' '),
         filename,
         content,
-        checksum: crypto.createHash('sha256').update(content).digest('hex'),
+        checksum: sha(lf),
+        // git core.autocrlf doi LF <-> CRLF khi checkout: file khong doi noi dung nhung hash tho doi.
+        // Chap nhan ca hai kieu de DB da ghi checksum theo kieu nao cung van khop
+        acceptedChecksums: [sha(lf), sha(lf.replace(/\n/g, '\r\n'))],
       };
     })
     .filter(Boolean)
@@ -128,7 +133,7 @@ async function validate() {
       if (!row) {
         throw new Error(`Migration ${f.filename} chua duoc ap dung - chay "npm run migrate"`);
       }
-      if (row.checksum !== f.checksum) {
+      if (!f.acceptedChecksums.includes(row.checksum)) {
         throw new Error(`Migration ${f.filename} da bi sua doi sau khi ap dung (checksum lech)`);
       }
     }

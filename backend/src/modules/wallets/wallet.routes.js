@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { query, withTransaction } = require('../../db');
-const { AppError, requireFields } = require('../../lib/errors');
+const { AppError } = require('../../lib/errors');
 const { requireAuthenticated } = require('../../middlewares/auth');
 const { requireRole } = require('../../middlewares/rbac');
 const wallet = require('../../services/wallet.service');
@@ -55,76 +55,6 @@ router.get('/venues/:venueId/me', async (req, res, next) => {
       Number(req.params.venueId),
     ]);
     res.json({ wallet: w.rows[0] || null });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/wallets/topups  body: { plan_id } -> thong tin chuyen khoan VietQR, noi dung NAP <ma>
-router.post('/topups', async (req, res, next) => {
-  try {
-    requireFields(req.body, ['plan_id']);
-    const out = await withTransaction(async (c) => {
-      const p = await c.query(
-        `SELECT p.*, v.name AS venue_name, v.status AS venue_status, v.bank_name, v.bank_account, v.bank_holder
-           FROM membership_plan p JOIN venue v ON v.id = p.venue_id WHERE p.id = $1 AND p.is_active`,
-        [Number(req.body.plan_id)]
-      );
-      const plan = p.rows[0];
-      if (!plan) throw new AppError('NOT_FOUND', { message: 'Gói thành viên không tồn tại hoặc đã ngừng bán' });
-      if (plan.venue_status !== 'APPROVED') throw new AppError('VENUE_NOT_APPROVED');
-      if (!plan.bank_account) throw new AppError('INVALID_OPERATION', { message: 'Cụm sân chưa cấu hình tài khoản nhận tiền' });
-      const w = await c.query(`SELECT status FROM member_wallet WHERE user_id = $1 AND venue_id = $2`, [req.user.id, plan.venue_id]);
-      if (w.rows[0]?.status === 'FROZEN') throw new AppError('WALLET_FROZEN');
-      // Lenh cu chua thanh toan cua cung goi thi huy, tranh nhieu ma cung luc
-      await c.query(
-        `UPDATE wallet_topup SET status = 'CANCELLED' WHERE user_id = $1 AND plan_id = $2 AND status = 'PENDING'`,
-        [req.user.id, plan.id]
-      );
-      const code = wallet.makeTopupCode();
-      const t = await c.query(
-        `INSERT INTO wallet_topup (code, user_id, venue_id, plan_id, amount) VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, code, amount, status, created_at`,
-        [code, req.user.id, plan.venue_id, plan.id, plan.price]
-      );
-      return {
-        topup: t.rows[0],
-        plan: { name: plan.name, price: Number(plan.price), bonus: Number(plan.bonus), discount_percent: plan.discount_percent },
-        transfer: {
-          bank_name: plan.bank_name,
-          bank_account: plan.bank_account,
-          bank_holder: plan.bank_holder,
-          amount: Number(plan.price),
-          content: `NAP ${code}`,
-        },
-      };
-    });
-    res.status(201).json(out);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/wallets/topups/:code - trang thai lenh nap (frontend polling)
-router.get('/topups/:code', async (req, res, next) => {
-  try {
-    const r = await query(`SELECT code, amount, status, paid_at FROM wallet_topup WHERE code = $1 AND user_id = $2`, [
-      req.params.code,
-      req.user.id,
-    ]);
-    if (r.rowCount === 0) throw new AppError('NOT_FOUND');
-    res.json(r.rows[0]);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/wallets/pay  body: { booking_code } - tra coc bang vi hoi vien cua cum san
-router.post('/pay', async (req, res, next) => {
-  try {
-    requireFields(req.body, ['booking_code']);
-    const out = await withTransaction((c) => wallet.payBooking(c, req.body.booking_code, req.user));
-    res.json(out);
   } catch (err) {
     next(err);
   }
