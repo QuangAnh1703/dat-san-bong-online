@@ -5,8 +5,7 @@ import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { Card, PageLayout } from '../components/ui/PageLayout';
 import { Modal } from '../components/ui/Modal';
-import { MockTransferButton, TransferQR, toTransfer } from '../components/TransferQR';
-import { FORMAT_LABEL, TOURNAMENT_STATUS } from './LeaderboardPage';
+import { FORMAT_LABEL, tournamentStatus } from './LeaderboardPage';
 
 const vnd = (n) => `${Math.round(Number(n)).toLocaleString('vi-VN')}đ`;
 const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -17,7 +16,6 @@ export const TournamentDetailPage = () => {
   const { isLoggedIn, setIsAuthModalOpen, role, showToast } = useApp();
   const [t, setT] = useState(null);
   const [error, setError] = useState(null);
-  const [fee, setFee] = useState(null);
   const [busy, setBusy] = useState(false);
   const [scores, setScores] = useState({});
   const [confirmForfeit, setConfirmForfeit] = useState(null);
@@ -58,7 +56,7 @@ export const TournamentDetailPage = () => {
     );
   }
 
-  const st = TOURNAMENT_STATUS[t.status];
+  const st = tournamentStatus(t);
   const myTeamId = t.my?.team?.id;
   const reg = t.my?.registration;
   const open = t.status === 'OPEN' && new Date(t.registration_deadline) > new Date();
@@ -69,8 +67,7 @@ export const TournamentDetailPage = () => {
   const register = async () => {
     if (!isLoggedIn) return setIsAuthModalOpen(true);
     const r = await run(() => apiClient.league.register(t.id));
-    if (r?.transfer) setFee(r.transfer);
-    else if (r) showToast('Đã đăng ký tham gia giải');
+    if (r) showToast('Đã đăng ký tham gia giải');
   };
 
   return (
@@ -244,16 +241,15 @@ export const TournamentDetailPage = () => {
                   <p className={reg.status === 'REGISTERED' ? 'text-emerald-400 font-semibold' : 'text-amber-300'}>
                     {t.my.team.name}: {TEAM_STATUS[reg.status]}
                   </p>
-                  {reg.status === 'PENDING_PAYMENT' && open && (
-                    <button onClick={register} className="w-full py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer">
-                      Xem mã chuyển lệ phí
-                    </button>
+                  {reg.status === 'PENDING_PAYMENT' && (
+                    <p className="text-slate-400">Thanh toán lệ phí online chưa được hỗ trợ.</p>
                   )}
                 </div>
+              ) : open && Number(t.fee) > 0 ? (
+                <p className="text-xs text-slate-400">Giải có lệ phí {vnd(t.fee)}: tạm chưa nhận đăng ký online vì chưa hỗ trợ thanh toán lệ phí.</p>
               ) : open ? (
                 <button disabled={busy} onClick={register} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold text-xs cursor-pointer">
                   Đăng ký {t.my.team.name}
-                  {Number(t.fee) > 0 && ` · ${vnd(t.fee)}`}
                 </button>
               ) : (
                 <p className="text-xs text-slate-400">Giải đã đóng đăng ký.</p>
@@ -286,22 +282,6 @@ export const TournamentDetailPage = () => {
           </Card>
         </div>
       </div>
-
-      {fee && (
-        <Modal title="Chuyển Lệ Phí Giải" description="Đội được ghi danh tự động khi tiền về" onClose={() => setFee(null)}>
-          <div className="space-y-3">
-            <TransferQR transfer={toTransfer(fee)} />
-            <MockTransferButton
-              content={fee.content}
-              amount={fee.amount}
-              onDone={async () => {
-                await load();
-                setFee(null);
-              }}
-            />
-          </div>
-        </Modal>
-      )}
 
       {confirmForfeit && (
         <Modal icon={Flag} title="Bỏ Trận Đấu?" description={`${confirmForfeit.home_name} vs ${confirmForfeit.away_name}`} onClose={() => setConfirmForfeit(null)} size="sm">

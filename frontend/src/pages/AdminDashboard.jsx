@@ -10,8 +10,8 @@ import {
   BarChart2,
   Clock,
   ChevronRight,
-  ArrowRightLeft,
   Wallet,
+  BookOpen,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
@@ -64,14 +64,9 @@ export const AdminDashboard = () => {
   const { adminStats, ownerApplications, pendingVenues, complaints, adminReport } = useApp();
   const openComplaints = complaints.filter((c) => !['RESOLVED', 'CLOSED'].includes(c.status)).length;
   const pendingTotal = ownerApplications.length + pendingVenues.length;
-  const [bankQueue, setBankQueue] = useState(0);
   const [frozenWallets, setFrozenWallets] = useState(0);
 
   useEffect(() => {
-    apiClient.payments.bankTransactions().then(
-      (res) => setBankQueue(res.count || 0),
-      () => undefined,
-    );
     apiClient.wallets.frozen().then(
       (res) => setFrozenWallets(res.count || 0),
       () => undefined,
@@ -145,13 +140,6 @@ export const AdminDashboard = () => {
                 danger
               />
               <TodoLink
-                to="/quan-tri/doi-soat"
-                icon={ArrowRightLeft}
-                title="Đối soát chuyển khoản"
-                hint="Giao dịch không tự khớp được / chờ hoàn tiền"
-                count={bankQueue}
-              />
-              <TodoLink
                 to="/quan-tri/vi-hoi-vien"
                 icon={Wallet}
                 title="Hoàn tiền ví hội viên"
@@ -160,6 +148,18 @@ export const AdminDashboard = () => {
                 danger
               />
             </div>
+            <Link
+              to="/quan-tri/tro-ly"
+              className="flex items-center gap-3 p-4 rounded-2xl border border-dashed border-slate-700 hover:border-cyan-700 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-cyan-950 text-cyan-300">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-bold text-white">Kho tri thức trợ lý</div>
+                <div className="text-xs text-slate-400">Bài viết trợ lý chat dùng để trả lời người dùng</div>
+              </div>
+            </Link>
           </AdminCard>
 
           <div className="xl:col-span-2">

@@ -6,7 +6,7 @@ import { apiClient } from '../services/api';
 import { toLocalISODate } from '../services/mappers';
 import { Card } from '../components/ui/PageLayout';
 import { OwnerPage, OWNER_INPUT, OWNER_PRIMARY_BTN } from '../components/owner/OwnerPage';
-import { FORMAT_LABEL, TOURNAMENT_STATUS } from './LeaderboardPage';
+import { FORMAT_LABEL, tournamentStatus } from './LeaderboardPage';
 
 const vnd = (n) => `${Math.round(Number(n)).toLocaleString('vi-VN')}đ`;
 const inDays = (d) => toLocalISODate(new Date(Date.now() + d * 86_400_000));
@@ -73,7 +73,7 @@ export const OwnerTournamentsPage = () => {
   const label = 'text-slate-300 font-semibold block mb-1';
 
   return (
-    <OwnerPage icon={Trophy} eyebrow="Giải đấu phong trào" description="Tạo giải, nhận lệ phí qua VietQR, hệ thống tự chia bảng và xếp lịch vào khung giờ trống của sân.">
+    <OwnerPage icon={Trophy} eyebrow="Giải đấu phong trào" description="Tạo giải, hệ thống tự chia bảng và xếp lịch vào khung giờ trống của sân.">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
         <Card className="lg:col-span-2">
           <h2 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5">
@@ -161,7 +161,7 @@ export const OwnerTournamentsPage = () => {
             </div>
           ) : (
             list.map((t) => {
-              const st = TOURNAMENT_STATUS[t.status];
+              const st = tournamentStatus(t);
               return (
                 <Link key={t.id} to={`/giai-dau/${t.id}`} className="block p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-700 text-xs space-y-1">
                   <div className="flex flex-wrap items-center gap-2">

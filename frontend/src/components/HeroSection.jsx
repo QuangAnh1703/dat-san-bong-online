@@ -50,7 +50,7 @@ export const HeroSection = ({ onSearchSubmit }) => {
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-slate-300 font-normal leading-relaxed max-w-2xl mb-8">
-            Xem lịch trống theo thời gian thực của từng sân con, giữ chỗ 5 phút và đặt cọc online. Hết lo đặt trùng sân,
+            Xem lịch trống theo thời gian thực của từng sân con, giữ chỗ 15 phút và đặt cọc online. Hết lo đặt trùng sân,
             hết cảnh chờ chủ sân <span className="text-emerald-300 font-medium italic">"anh gọi lại sau nhé"</span>.
           </p>
 
@@ -68,7 +68,7 @@ export const HeroSection = ({ onSearchSubmit }) => {
               <div className="text-xs sm:text-sm text-slate-400 font-medium">đánh giá trung bình</div>
             </div>
             <div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-white font-display tabular-nums">5 phút</div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white font-display tabular-nums">15 phút</div>
               <div className="text-xs sm:text-sm text-slate-400 font-medium">thời gian giữ chỗ an toàn</div>
             </div>
           </div>

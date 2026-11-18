@@ -3,17 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Users, AlertCircle, Loader2 } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { Card, PageLayout } from '../components/ui/PageLayout';
-import { SKILL_LABELS, formatViDate, todayISO } from '../services/mappers';
+import { DEAL_OPTIONS, SKILL_LABELS, formatViDate, todayISO } from '../services/mappers';
 
 const inputCls =
   'w-full h-11 px-3 rounded-xl border border-slate-700 bg-slate-800 text-sm text-white focus:border-emerald-500 focus:outline-none';
 const labelCls = 'text-xs text-slate-300 font-semibold block mb-1.5';
 
-const DEALS = [
-  { value: 'Chia đôi tiền sân 50/50', hint: 'Mỗi đội trả một nửa' },
-  { value: 'Thua trả 100% tiền sân', hint: 'Đội thua trả toàn bộ' },
-  { value: 'Giao lưu vui vẻ 1 két nước', hint: 'Đội thua mời nước' },
-];
 
 export const ChallengePostPage = () => {
   const { user, bookings, bookingsLoading, createChallenge } = useApp();
@@ -28,7 +23,7 @@ export const ChallengePostPage = () => {
   );
 
   const [bookingCode, setBookingCode] = useState('');
-  const [dealNote, setDealNote] = useState(DEALS[0].value);
+  const [loserPercent, setLoserPercent] = useState(50);
   const [content, setContent] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
@@ -45,7 +40,7 @@ export const ChallengePostPage = () => {
     setPosting(true);
     setError(null);
     try {
-      await createChallenge(booking.bookingDbId, dealNote, content.trim());
+      await createChallenge(booking.bookingDbId, loserPercent, content.trim());
       navigate('/giao-huu');
     } catch (err) {
       setError(errorMessage(err));
@@ -123,20 +118,23 @@ export const ChallengePostPage = () => {
 
         <Card className="space-y-4">
           <h2 className="text-base font-bold text-white">2. Hình thức chia tiền</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {DEALS.map((d) => (
+          <p className="text-[0.8125rem] text-slate-500">
+            Trước trận chỉ đóng cọc. Sau trận chủ sân nhập tỷ số, tiền sân được chia theo kèo này (hòa thì chia đôi).
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {DEAL_OPTIONS.map((d) => (
               <button
-                key={d.value}
+                key={d.percent}
                 type="button"
-                aria-pressed={dealNote === d.value}
-                onClick={() => setDealNote(d.value)}
+                aria-pressed={loserPercent === d.percent}
+                onClick={() => setLoserPercent(d.percent)}
                 className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
-                  dealNote === d.value
+                  loserPercent === d.percent
                     ? 'bg-emerald-950 border-emerald-500 text-white'
                     : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
                 }`}
               >
-                <div className="font-bold text-sm">{d.value}</div>
+                <div className="font-bold text-sm">{d.label}</div>
                 <div className="text-[0.8125rem] mt-0.5 opacity-80">{d.hint}</div>
               </button>
             ))}
@@ -165,7 +163,7 @@ export const ChallengePostPage = () => {
             label="Giờ đá"
             value={booking ? `${formatViDate(booking.date)} · ${booking.startTime} - ${booking.endTime}` : '—'}
           />
-          <Row label="Chia tiền" value={dealNote} highlight />
+          <Row label="Chia tiền" value={DEAL_OPTIONS.find((d) => d.percent === loserPercent).label} highlight />
         </div>
         <p className="pt-3 border-t border-slate-800 text-[0.8125rem] text-slate-500">
           Đăng dưới tên đội, trình độ theo hồ sơ đội. Bài tự đóng khi chốt kèo hoặc tới giờ đá.

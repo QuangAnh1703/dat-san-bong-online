@@ -78,7 +78,7 @@ export const Footer = ({ onNavigateSection }) => {
               </li>
               <li>
                 <a href="#payout" className="hover:text-emerald-400 transition-colors">
-                  Đối soát dòng tiền VietQR Napas
+                  Thanh toán cọc qua SePay
                 </a>
               </li>
             </ul>

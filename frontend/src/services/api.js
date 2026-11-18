@@ -104,6 +104,10 @@ async function fetchApi(endpoint, options = {}, retried = false) {
 
   if (!res.ok) {
     const e = payload?.error;
+    // 502/503/504 không kèm JSON chuẩn: Vite proxy / reverse proxy không gọi được backend (tắt hoặc đang khởi động lại)
+    if (!e && [502, 503, 504].includes(res.status)) {
+      throw new ApiError('NETWORK_ERROR', 'Không kết nối được máy chủ, vui lòng thử lại sau giây lát.', res.status);
+    }
     const code = e?.code || 'UNKNOWN';
     const message = e?.message || res.statusText || 'Yêu cầu thất bại';
 
@@ -175,6 +179,14 @@ export const apiClient = {
     resolveComplaint: (id, outcome, resolution, extra = {}) =>
       fetchApi(`/api/admin/complaints/${id}/resolve`, post({ outcome, resolution, ...extra })),
     getReports: (range = {}) => fetchApi(`/api/admin/reports?${new URLSearchParams(range)}`),
+    // Kho tri thức của trợ lý (RAG)
+    knowledge: {
+      list: (params = {}) => fetchApi(`/api/admin/knowledge?${new URLSearchParams(params)}`),
+      search: (q, role) => fetchApi(`/api/admin/knowledge/search?${new URLSearchParams({ q, role })}`),
+      create: (data) => fetchApi('/api/admin/knowledge', post(data)),
+      update: (id, data) => fetchApi(`/api/admin/knowledge/${id}`, put(data)),
+      remove: (id) => fetchApi(`/api/admin/knowledge/${id}`, { method: 'DELETE' }),
+    },
     exportReport: async (range) => {
       // CSV tải trực tiếp (<= 1 năm) hoặc 202 khi báo cáo được gửi qua email
       const token = tokenStore.get();
@@ -222,16 +234,7 @@ export const apiClient = {
   },
 
   payments: {
-    reportTransfer: (bookingCode) => fetchApi('/api/payments', post({ booking_code: bookingCode })),
-    startVnpay: (bookingCode) => fetchApi('/api/payments/vnpay', post({ booking_code: bookingCode })),
-    bankConfig: () => fetchApi('/api/payments/bank/config'),
-    mockTransfer: (data) => fetchApi('/api/payments/bank/mock-transfer', post(data)),
-    bankTransactions: (status) =>
-      fetchApi(`/api/payments/bank/transactions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-    assignTransaction: (id, bookingCode) =>
-      fetchApi(`/api/payments/bank/transactions/${id}/assign`, post({ booking_code: bookingCode })),
-    resolveTransaction: (id, action, note) =>
-      fetchApi(`/api/payments/bank/transactions/${id}/resolve`, post({ action, note })),
+    sepayInfo: (bookingCode) => fetchApi(`/api/payments/sepay/${encodeURIComponent(bookingCode)}`),
   },
 
   pos: {
@@ -258,9 +261,6 @@ export const apiClient = {
     plans: (venueId) => fetchApi(`/api/wallets/venues/${venueId}/plans`),
     mine: () => fetchApi('/api/wallets/mine'),
     myAtVenue: (venueId) => fetchApi(`/api/wallets/venues/${venueId}/me`),
-    topup: (planId) => fetchApi('/api/wallets/topups', post({ plan_id: planId })),
-    topupStatus: (code) => fetchApi(`/api/wallets/topups/${code}`),
-    pay: (bookingCode) => fetchApi('/api/wallets/pay', post({ booking_code: bookingCode })),
     ownerPlans: (venueId) => fetchApi(`/api/wallets/owner/venues/${venueId}/plans`),
     createPlan: (venueId, data) => fetchApi(`/api/wallets/owner/venues/${venueId}/plans`, post(data)),
     updatePlan: (id, data) => fetchApi(`/api/wallets/owner/plans/${id}`, put(data)),
@@ -272,7 +272,8 @@ export const apiClient = {
     leaderboard: (sort, district) =>
       fetchApi(`/api/leaderboard?sort=${sort}${district ? `&district=${encodeURIComponent(district)}` : ''}`),
     myResults: () => fetchApi('/api/matches/results/mine'),
-    submitResult: (code, home, away) =>
+    pendingResults: () => fetchApi('/api/matches/results/pending'),
+    recordResult: (code, home, away) =>
       fetchApi(`/api/matches/${code}/result`, post({ home_score: home, away_score: away })),
     tournaments: (params = '') => fetchApi(`/api/tournaments${params}`),
     tournament: (id) => fetchApi(`/api/tournaments/${id}`),
@@ -282,6 +283,11 @@ export const apiClient = {
     matchResult: (id, home, away) =>
       fetchApi(`/api/tournaments/matches/${id}/result`, post({ home_score: home, away_score: away })),
     forfeit: (id, teamId) => fetchApi(`/api/tournaments/matches/${id}/forfeit`, post(teamId ? { team_id: teamId } : {})),
+  },
+
+  chatbot: {
+    // messages: [{ role: 'user' | 'assistant', content }] - server không lưu lịch sử, gửi lại cả hội thoại
+    send: (messages) => fetchApi('/api/chatbot/messages', post({ messages })),
   },
 
   complaints: {

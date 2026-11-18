@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRightLeft, LogOut, ClipboardList, Check, X, Loader2, User, Wallet } from 'lucide-react';
+import { LogOut, ClipboardList, Check, X, Loader2, User, Wallet } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { mapOwnerBooking } from '../services/mappers';
 import { Modal } from '../components/ui/Modal';
 import { CheckoutModal } from '../components/owner/CheckoutModal';
+import { OwnerMatchResults } from '../components/owner/OwnerMatchResults';
 import {
   OwnerPage,
   OWNER_INPUT,
-  OWNER_PRIMARY_BTN,
   OWNER_SECONDARY_BTN,
   TODO_STATUSES,
   statusOf,
@@ -87,15 +86,10 @@ export const OwnerBookingsPage = () => {
     <OwnerPage
       icon={ClipboardList}
       eyebrow="Duyệt & quản lý đơn đặt sân"
-      description="Chuyển khoản đúng nội dung được tự xác nhận; đơn còn lại kiểm tra tài khoản rồi xác nhận tay."
-      actions={
-        <Link to="/chu-san/doi-soat" className={`${OWNER_PRIMARY_BTN} inline-flex items-center gap-1.5`}>
-          <ArrowRightLeft className="w-3.5 h-3.5" />
-          <span>Đối soát chuyển khoản</span>
-        </Link>
-      }
+      description="Khách thanh toán cọc qua SePay được xác nhận tự động; đơn tại quầy kiểm tra rồi xác nhận tay."
     >
       <div className="space-y-4">
+        <OwnerMatchResults />
         <div className="flex gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-semibold w-full sm:w-auto sm:inline-flex overflow-x-auto">
           {FILTERS.map((f) => (
             <button

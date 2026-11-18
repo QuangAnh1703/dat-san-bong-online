@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { errorMessage, useApp } from '../context/AppContext';
-import { formatViDate, SLOT_MINUTES, toLocalISODate } from '../services/mappers';
+import { DEAL_OPTIONS, formatViDate, SLOT_MINUTES, toLocalISODate } from '../services/mappers';
 import { PaymentPanel } from '../components/PaymentPanel';
 import { MembershipSection } from '../components/MembershipSection';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MapPin, Phone, Clock, ShieldCheck, Zap, CheckCircle2, AlertCircle, Lock, Loader2 } from 'lucide-react';
 import { Card, PageLayout } from '../components/ui/PageLayout';
 
@@ -27,6 +27,7 @@ const PITCH_TYPE_LABEL = {
 
 export const VenueDetailPage = () => {
   const { id } = useParams();
+  const { search } = useLocation();
   const { pitches, pitchesLoading } = useApp();
   const pitch = pitches.find((p) => String(p.id) === id);
 
@@ -51,19 +52,29 @@ export const VenueDetailPage = () => {
       </PageLayout>
     );
   }
-  // key: đổi sân thì reset toàn bộ state đặt chỗ
-  return <VenueDetail key={pitch.id} pitch={pitch} />;
+  // key: đổi sân (hoặc mở link ca khác từ trợ lý) thì reset toàn bộ state đặt chỗ
+  return <VenueDetail key={`${pitch.id}?${search}`} pitch={pitch} />;
 };
 
 const VenueDetail = ({ pitch }) => {
   const navigate = useNavigate();
   const { user, isLoggedIn, createBooking, loadSubPitches, setIsAuthModalOpen, reloadPitches } = useApp();
 
+  // Link từ trợ lý đặt sân: /san/:id?ngay=YYYY-MM-DD&san=<fieldId>&gio=HH:MM -> chọn sẵn ca
+  const [searchParams] = useSearchParams();
   const dates = useMemo(() => upcomingDates(7), []);
-  const [selectedDate, setSelectedDate] = useState(dates[0].val);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const ngay = searchParams.get('ngay');
+    return dates.some((d) => d.val === ngay) ? ngay : dates[0].val;
+  });
   const [subPitches, setSubPitches] = useState(pitch.subPitches);
-  const [selectedSubPitchId, setSelectedSubPitchId] = useState(pitch.subPitches[0]?.id || '');
+  const [selectedSubPitchId, setSelectedSubPitchId] = useState(() => {
+    const san = searchParams.get('san');
+    return pitch.subPitches.some((s) => s.id === san) ? san : pitch.subPitches[0]?.id || '';
+  });
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [pendingStart, setPendingStart] = useState(() => searchParams.get('gio'));
+  const [loadedDate, setLoadedDate] = useState(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState(null);
 
@@ -75,7 +86,7 @@ const VenueDetail = ({ pitch }) => {
   const [selectedServices, setSelectedServices] = useState({});
   const [depositOption, setDepositOption] = useState('partial');
   const [lookingForRival, setLookingForRival] = useState(false);
-  const [dealNote, setDealNote] = useState('Chia đôi tiền sân 50/50');
+  const [loserPercent, setLoserPercent] = useState(50);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState(null);
   const [bookingSuccess, setBookingSuccess] = useState(null);
@@ -91,6 +102,7 @@ const VenueDetail = ({ pitch }) => {
     setScheduleError(null);
     try {
       setSubPitches(await loadSubPitches(pitch, date));
+      setLoadedDate(date);
     } catch (err) {
       setScheduleError(errorMessage(err));
     } finally {
@@ -105,12 +117,22 @@ const VenueDetail = ({ pitch }) => {
 
   const selectedSubPitch = subPitches.find((s) => s.id === selectedSubPitchId) || subPitches[0];
 
+  // Chọn ca từ link sau khi lịch ngày đó tải xong; ca đã bị đặt mất thì bỏ qua
+  useEffect(() => {
+    if (!pendingStart || loadedDate !== selectedDate || !selectedSubPitch?.slots) return;
+    const slot = selectedSubPitch.slots.find((s) => s.startTime === pendingStart && s.status === 'available');
+    if (slot) setSelectedSlot(slot);
+    setPendingStart(null);
+  }, [pendingStart, loadedDate, selectedDate, selectedSubPitch]);
+
   const slotPrice = selectedSlot ? selectedSlot.price : 0;
   const servicesTotal = pitch.services.reduce((sum, x) => sum + x.price * (selectedServices[x.id] || 0), 0);
   const servicesCount = Object.values(selectedServices).reduce((a, b) => a + b, 0);
   const totalPrice = slotPrice + servicesTotal;
   // Cùng công thức với backend: cọc = tổng × tỷ lệ cọc của sân, hoặc 100% nếu chọn trả hết
-  const depositAmount = depositOption === 'full' ? totalPrice : Math.round(totalPrice * pitch.depositRate);
+  // Tìm đối giao hữu: chỉ đặt cọc, phần còn lại chia theo kèo sau trận
+  const rivalMode = lookingForRival && !!user.team;
+  const depositAmount = depositOption === 'full' && !rivalMode ? totalPrice : Math.round(totalPrice * pitch.depositRate);
 
   const setServiceQty = (item, qty) =>
     setSelectedServices((prev) => {
@@ -146,9 +168,9 @@ const VenueDetail = ({ pitch }) => {
         phone,
         note: teamName.trim() ? `Đội: ${teamName.trim()}` : undefined,
         services: Object.entries(selectedServices).map(([id, quantity]) => ({ id: Number(id), quantity })),
-        payFull: depositOption === 'full',
+        payFull: depositOption === 'full' && !rivalMode,
         lookingForRival: lookingForRival && !!user.team,
-        dealNote,
+        loserPercent,
       });
       setBookingSuccess(booking);
       reloadPitches();
@@ -202,8 +224,8 @@ const VenueDetail = ({ pitch }) => {
                 Mã đơn: <span className="font-mono font-bold text-emerald-400">{bookingSuccess.id}</span>
               </p>
               <p className="text-xs text-amber-300 mt-1">
-                Khung giờ được giữ{holdUntil ? ` đến ${holdUntil}` : ''}. Chuyển cọc và bấm "Tôi đã chuyển khoản" để chủ
-                sân xác nhận.
+                Khung giờ được giữ{holdUntil ? ` đến ${holdUntil}` : ''}. Thanh toán cọc qua SePay để
+                đơn được xác nhận ngay.
               </p>
             </div>
 
@@ -528,13 +550,15 @@ const VenueDetail = ({ pitch }) => {
                       </label>
                       {lookingForRival && (
                         <select
-                          value={dealNote}
-                          onChange={(e) => setDealNote(e.target.value)}
+                          value={loserPercent}
+                          onChange={(e) => setLoserPercent(Number(e.target.value))}
                           className="w-full h-9 px-3 text-xs rounded-lg border border-slate-700 bg-slate-900 text-white focus:outline-none"
                         >
-                          <option value="Chia đôi tiền sân 50/50">Chia đôi tiền sân 50/50</option>
-                          <option value="Thua trả 100% tiền sân">Thua trả 100% tiền sân</option>
-                          <option value="Giao lưu vui vẻ 1 két nước">Giao lưu vui vẻ 1 két nước</option>
+                          {DEAL_OPTIONS.map((d) => (
+                            <option key={d.percent} value={d.percent}>
+                              {d.label}
+                            </option>
+                          ))}
                         </select>
                       )}
                     </div>
@@ -631,14 +655,14 @@ const VenueDetail = ({ pitch }) => {
 
                       <div className="pt-2 space-y-2">
                         <div className="text-xs font-semibold text-slate-300">Hình thức cọc:</div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {['partial', 'full'].map((opt) => (
+                        <div className={`grid gap-2 text-xs ${rivalMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          {(rivalMode ? ['partial'] : ['partial', 'full']).map((opt) => (
                             <button
                               key={opt}
                               type="button"
                               onClick={() => setDepositOption(opt)}
                               className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
-                                depositOption === opt
+                                (rivalMode ? 'partial' : depositOption) === opt
                                   ? 'bg-emerald-950 border-emerald-500 text-white font-bold'
                                   : 'bg-slate-950 border-slate-800 text-slate-400'
                               }`}
@@ -662,7 +686,7 @@ const VenueDetail = ({ pitch }) => {
 
                       <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[0.8125rem] text-slate-400 space-y-1">
                         <div>• Sau khi xác nhận, hệ thống giữ khung giờ này cho bạn trong 15 phút.</div>
-                        <div>• Chuyển khoản qua mã VietQR ở bước tiếp theo để chủ sân xác nhận đơn.</div>
+                        <div>• Thanh toán cọc qua SePay ở bước tiếp theo, đơn được xác nhận ngay.</div>
                       </div>
 
                       {bookingError && (

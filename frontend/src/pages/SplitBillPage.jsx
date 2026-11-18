@@ -5,7 +5,6 @@ import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
 import { Card, PageLayout } from '../components/ui/PageLayout';
 import { Modal } from '../components/ui/Modal';
-import { MockTransferButton, TransferQR } from '../components/TransferQR';
 
 const vnd = (n) => `${Math.round(Number(n)).toLocaleString('vi-VN')}đ`;
 const INPUT =
@@ -146,11 +145,15 @@ const CreateForm = ({ code, onCreated, showToast }) => {
     <form onSubmit={submit} className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
       <div className="lg:col-span-2 space-y-4">
         <Card>
-          <h2 className="text-sm font-bold text-white mb-1">Tổng chi phí trận</h2>
+          <h2 className="text-sm font-bold text-white mb-1">
+            {cand.match_settled ? 'Phần đội bạn chịu theo kèo' : 'Tổng chi phí trận'}
+          </h2>
           <div className="text-2xl font-black text-emerald-400 tabular-nums">{vnd(cand.total)}</div>
           <p className="text-xs text-slate-400">
-            Tiền sân + dịch vụ đặt kèm {vnd(cand.field_and_online_services)}
-            {cand.pos_services > 0 && ` · nước/dịch vụ phát sinh tại sân ${vnd(cand.pos_services)}`}
+            {cand.match_settled
+              ? `Trên tổng chi phí ${vnd(cand.field_and_online_services + cand.pos_services)}, chia theo tỷ số và kèo đã thống nhất`
+              : `Tiền sân + dịch vụ đặt kèm ${vnd(cand.field_and_online_services)}`}
+            {!cand.match_settled && cand.pos_services > 0 && ` · nước/dịch vụ phát sinh tại sân ${vnd(cand.pos_services)}`}
           </p>
         </Card>
 
@@ -344,17 +347,13 @@ const BillView = ({ data, code, reload, showToast }) => {
         {mine ? (
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-white">Phần của bạn: {vnd(mine.amount)}</h2>
-            <TransferQR
-              transfer={{
-                bankName: bill.bank_name,
-                bankAccount: bill.bank_account,
-                bankHolder: bill.bank_holder,
-                amount: Number(mine.amount),
-                content: `QUY ${code} ${mine.phone}`,
-              }}
-            />
-            <p className="text-xs text-slate-400">Giữ nguyên nội dung, hệ thống tự gạch nợ khi tiền về.</p>
-            <MockTransferButton content={`QUY ${code} ${mine.phone}`} amount={Number(mine.amount)} onDone={reload} />
+            <div className="text-xs text-slate-300 space-y-1">
+              <div>
+                Chuyển cho đội trưởng: {bill.bank_name} · <b className="text-white">{bill.bank_account}</b>
+              </div>
+              <div>{bill.bank_holder}</div>
+            </div>
+            <p className="text-xs text-slate-400">Đội trưởng sẽ đánh dấu đã nhận khi thấy tiền về.</p>
           </div>
         ) : (
           <div className="text-xs text-slate-300 space-y-2">
@@ -364,7 +363,7 @@ const BillView = ({ data, code, reload, showToast }) => {
             </div>
             <div>{bill.bank_holder}</div>
             <p className="text-slate-500">
-              Mỗi thành viên chuyển khoản với nội dung <b className="text-slate-300">QUY {code} &lt;SĐT&gt;</b>, hệ thống tự cập nhật trạng thái.
+              Mỗi thành viên chuyển khoản cho bạn; khi nhận được, bấm đánh dấu đã trả cho người đó.
             </p>
           </div>
         )}

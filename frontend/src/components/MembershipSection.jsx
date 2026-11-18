@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, CreditCard, Loader2, Wallet } from 'lucide-react';
-import { errorMessage, useApp } from '../context/AppContext';
+import { CreditCard, Wallet } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
-import { Modal } from './ui/Modal';
-import { MockTransferButton, TransferQR, toTransfer } from './TransferQR';
 
 const vnd = (n) => `${Math.round(Number(n)).toLocaleString('vi-VN')}đ`;
 
 // Gói hội viên của cụm sân + số dư ví của tôi (PRD 2.2.6)
 export const MembershipSection = ({ venueId, venueName }) => {
-  const { isLoggedIn, setIsAuthModalOpen, showToast } = useApp();
+  const { isLoggedIn } = useApp();
   const [plans, setPlans] = useState([]);
   const [wallet, setWallet] = useState(null);
-  const [buying, setBuying] = useState(null);
 
   const loadWallet = () =>
     isLoggedIn ? apiClient.wallets.myAtVenue(venueId).then((r) => setWallet(r.wallet), () => undefined) : Promise.resolve();
@@ -23,18 +20,6 @@ export const MembershipSection = ({ venueId, venueName }) => {
   }, [venueId, isLoggedIn]);
 
   if (plans.length === 0 && !wallet) return null;
-
-  const buy = async (plan) => {
-    if (!isLoggedIn) {
-      setIsAuthModalOpen(true);
-      return;
-    }
-    try {
-      setBuying(await apiClient.wallets.topup(plan.id));
-    } catch (err) {
-      showToast(errorMessage(err), 'error');
-    }
-  };
 
   return (
     <section className="bg-slate-900 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-4">
@@ -65,63 +50,15 @@ export const MembershipSection = ({ venueId, venueName }) => {
               {p.discount_percent > 0 && <div className="text-xs text-amber-300">Giảm thêm {p.discount_percent}% tiền sân</div>}
             </div>
             <button
-              onClick={() => buy(p)}
-              disabled={wallet?.status === 'FROZEN'}
-              className="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs cursor-pointer"
+              disabled
+              className="py-2 rounded-xl bg-slate-800 text-slate-400 font-bold text-xs cursor-not-allowed"
             >
-              Mua gói
+              Chưa mở bán online
             </button>
           </div>
         ))}
       </div>
-      <p className="text-[0.8125rem] text-slate-500">Khi đặt sân tại cụm sân này, bạn có thể trả cọc bằng ví hội viên.</p>
-      {buying && (
-        <TopupModal
-          data={buying}
-          onClose={() => setBuying(null)}
-          onPaid={() => {
-            loadWallet();
-            showToast('Đã kích hoạt gói thành viên');
-          }}
-        />
-      )}
+      <p className="text-[0.8125rem] text-slate-500">Thanh toán gói thành viên online chưa được hỗ trợ.</p>
     </section>
-  );
-};
-
-const TopupModal = ({ data, onClose, onPaid }) => {
-  const [status, setStatus] = useState(data.topup.status);
-  const code = data.topup.code;
-
-  const check = () =>
-    apiClient.wallets.topupStatus(code).then((r) => {
-      if (r.status === 'PAID' && status !== 'PAID') onPaid();
-      setStatus(r.status);
-    }, () => undefined);
-
-  useEffect(() => {
-    if (status === 'PAID') return undefined;
-    const t = setInterval(() => document.visibilityState === 'visible' && check(), 5000);
-    return () => clearInterval(t);
-  }, [status]);
-
-  return (
-    <Modal icon={CreditCard} title={`Mua Gói ${data.plan.name}`} description={`Nhận ${vnd(data.plan.price + data.plan.bonus)} vào ví`} onClose={onClose}>
-      {status === 'PAID' ? (
-        <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-300 flex items-center gap-2 font-semibold">
-          <CheckCircle2 className="w-4 h-4" />
-          Đã nhận tiền, ví hội viên đã được cộng.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <TransferQR transfer={toTransfer(data.transfer)} />
-          <p className="text-slate-400 flex items-center gap-1.5">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
-            Giữ nguyên nội dung chuyển khoản, ví được cộng tự động khi tiền về.
-          </p>
-          <MockTransferButton content={data.transfer.content} amount={data.transfer.amount} onDone={check} />
-        </div>
-      )}
-    </Modal>
   );
 };

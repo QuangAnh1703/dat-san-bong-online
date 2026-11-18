@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
+import { ChatbotWidget } from './components/ChatbotWidget';
 import { HomePage } from './pages/HomePage';
 import { VenueDetailPage } from './pages/VenueDetailPage';
 import { SubscriptionPage } from './pages/SubscriptionPage';
@@ -24,7 +25,6 @@ import { OwnerVenueFormPage } from './pages/OwnerVenueFormPage';
 import { GoogleCallbackPage } from './pages/GoogleCallbackPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { ComplaintsPage } from './pages/ComplaintsPage';
-import { PaymentResultPage } from './pages/PaymentResultPage';
 import { AdminComplaintDetailPage } from './pages/AdminComplaintDetailPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminUsersPage } from './pages/AdminUsersPage';
@@ -32,7 +32,6 @@ import { AdminOwnerRequestsPage } from './pages/AdminOwnerRequestsPage';
 import { AdminVenuesPage } from './pages/AdminVenuesPage';
 import { AdminComplaintsPage } from './pages/AdminComplaintsPage';
 import { AdminReportsPage } from './pages/AdminReportsPage';
-import { ReconciliationPage } from './pages/ReconciliationPage';
 import { OwnerServicesPage } from './pages/OwnerServicesPage';
 import { OwnerMembershipPage } from './pages/OwnerMembershipPage';
 import { OwnerTournamentsPage } from './pages/OwnerTournamentsPage';
@@ -40,6 +39,7 @@ import { SplitBillPage } from './pages/SplitBillPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { TournamentDetailPage } from './pages/TournamentDetailPage';
 import { AdminWalletsPage } from './pages/AdminWalletsPage';
+import { AdminKnowledgePage } from './pages/AdminKnowledgePage';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 // Trang cần tài khoản: chưa đăng nhập thì về trang chủ và mở hộp thoại đăng nhập
@@ -73,7 +73,6 @@ const OWNER_PAGES = [
   ['/chu-san/cum-san', OwnerVenuesPage],
   ['/chu-san/cum-san/moi', OwnerVenueFormPage],
   ['/chu-san/cum-san/:id', OwnerVenueFormPage],
-  ['/chu-san/doi-soat', ReconciliationPage],
   ['/chu-san/dich-vu', OwnerServicesPage],
   ['/chu-san/goi-thanh-vien', OwnerMembershipPage],
   ['/chu-san/giai-dau', OwnerTournamentsPage],
@@ -86,8 +85,8 @@ const ADMIN_PAGES = [
   ['/quan-tri/khieu-nai', AdminComplaintsPage],
   ['/quan-tri/khieu-nai/:id', AdminComplaintDetailPage],
   ['/quan-tri/bao-cao', AdminReportsPage],
-  ['/quan-tri/doi-soat', ReconciliationPage],
   ['/quan-tri/vi-hoi-vien', AdminWalletsPage],
+  ['/quan-tri/tro-ly', AdminKnowledgePage],
 ];
 
 const Shell = () => {
@@ -194,7 +193,6 @@ const Shell = () => {
           }
         />
         <Route path="/auth/google-callback" element={<GoogleCallbackPage />} />
-        <Route path="/thanh-toan/ket-qua" element={<PaymentResultPage />} />
         {['/tin-nhan', '/tin-nhan/:id'].map((path) => (
           <Route
             key={path}
@@ -240,6 +238,9 @@ const Shell = () => {
       </Routes>
 
       {isAuthModalOpen && <AuthModal onClose={() => setIsAuthModalOpen(false)} />}
+
+      {/* key: đổi vai trò (đăng nhập / đăng xuất) thì tạo trợ lý mới với lịch sử riêng */}
+      <ChatbotWidget key={role} role={role} />
 
       <Footer onNavigateSection={handleNavigateSection} />
     </div>

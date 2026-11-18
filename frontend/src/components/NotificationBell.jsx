@@ -8,8 +8,10 @@ const POLL_MS = 60 * 1000;
 // Mở trang liên quan theo loại thông báo; còn lại gắn với đơn thì mở lịch đặt
 const TARGETS = [
   [/^SPLIT_/, null],
+  [/^MATCH_RESULT_OWNER_DUE$/, '/chu-san/don-dat'],
   [/^MATCH_RESULT_/, '/lich-cua-toi'],
-  [/^TOURNAMENT_/, '/bang-xep-hang?tab=giai-dau'],
+  [/^TOURNAMENT_RESULT_DUE$/, '/chu-san/giai-dau'],
+  [/^TOURNAMENT_/,'/bang-xep-hang?tab=giai-dau'],
   [/^WALLET_FROZEN_ADMIN$/, '/quan-tri/vi-hoi-vien'],
   [/^WALLET_/, '/ho-so'],
   [/^(FREELANCE|INVITE|RECRUIT)_/, '/ghep-chan-le?tab=cua-toi'],

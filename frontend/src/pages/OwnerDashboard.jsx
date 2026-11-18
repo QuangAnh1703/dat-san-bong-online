@@ -13,7 +13,6 @@ import {
   Sliders,
   CreditCard,
   Trophy,
-  ArrowRightLeft,
 } from 'lucide-react';
 import { errorMessage, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
@@ -228,7 +227,6 @@ export const OwnerDashboard = () => {
             ['/chu-san/bang-gia', Sliders, 'Bảng giá & Flash Sale'],
             ['/chu-san/goi-thanh-vien', CreditCard, 'Gói thành viên'],
             ['/chu-san/giai-dau', Trophy, 'Giải đấu'],
-            ['/chu-san/doi-soat', ArrowRightLeft, 'Đối soát chuyển khoản'],
           ].map(([to, Icon, label]) => (
             <Link
               key={to}

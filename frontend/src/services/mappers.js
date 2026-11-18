@@ -653,3 +653,11 @@ export function distanceKm(lat1, lon1, lat2, lon2) {
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
 }
+
+// Kèo chia tiền thống nhất trước trận: % tổng chi phí đội thua chịu (hòa luôn chia đôi)
+export const DEAL_OPTIONS = [
+  { percent: 50, label: 'Chia đôi 50/50', hint: 'Mỗi đội trả một nửa, không phân biệt thắng thua' },
+  { percent: 60, label: 'Thua trả 60%', hint: 'Đội thua 60%, đội thắng 40%' },
+  { percent: 70, label: 'Thua trả 70%', hint: 'Đội thua 70%, đội thắng 30%' },
+  { percent: 100, label: 'Thua trả 100%', hint: 'Đội thua trả toàn bộ tiền sân' },
+];

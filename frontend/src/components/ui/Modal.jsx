@@ -16,7 +16,15 @@ const TONES = {
 
 // Hộp thoại dùng chung: chỉ cho thao tác ngắn (đăng nhập, xác nhận, form nhỏ).
 // Mobile hiển thị dạng bottom sheet, từ sm trở lên căn giữa.
-export const Modal = ({ title, description, icon: Icon, onClose, size = 'md', tone = 'emerald', children }) => {
+export const Modal = ({
+  title,
+  description,
+  icon: Icon,
+  onClose,
+  size = 'md',
+  tone = 'emerald',
+  children,
+}) => {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
@@ -27,6 +35,20 @@ export const Modal = ({ title, description, icon: Icon, onClose, size = 'md', to
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
+
+  // size="full": phủ kín màn hình, nội dung tự dàn trang (dùng cho đăng nhập / đăng ký)
+  if (size === 'full') {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0b130e] animate-in fade-in duration-150">
+        <div role="dialog" aria-modal="true" className="relative min-h-full w-full">
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
+            <CloseButton onClick={onClose} large />
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm" onMouseDown={onClose}>
@@ -60,13 +82,13 @@ export const Modal = ({ title, description, icon: Icon, onClose, size = 'md', to
   );
 };
 
-const CloseButton = ({ onClick }) => (
+const CloseButton = ({ onClick, large }) => (
   <button
     type="button"
     onClick={onClick}
     aria-label="Đóng"
-    className="w-8 h-8 shrink-0 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+    className={`${large ? 'w-11 h-11 rounded-xl bg-slate-900/80 border border-slate-800' : 'w-8 h-8 rounded-lg'} shrink-0 text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer`}
   >
-    <X className="w-4 h-4" />
+    <X className={large ? 'w-5 h-5' : 'w-4 h-4'} />
   </button>
 );

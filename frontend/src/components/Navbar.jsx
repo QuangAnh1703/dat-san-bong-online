@@ -125,7 +125,11 @@ export const Navbar = ({ onNavigateSection }) => {
   const { role, user, isLoggedIn, logout, bookings, setIsAuthModalOpen, ownerApplications, pendingVenues, complaints } =
     useApp();
 
-  const activeBookingsCount = bookings.filter((b) => b.status === 'confirmed' || b.status === 'holding').length;
+  // Khớp tab "Sắp đá" ở Lịch của tôi: bỏ trận đã kết thúc dù đơn còn CONFIRMED (job nền chưa kịp chuyển COMPLETED)
+  const now = Date.now();
+  const activeBookingsCount = bookings.filter(
+    (b) => (b.status === 'confirmed' || b.status === 'holding') && !(b.endsAt <= now)
+  ).length;
   const adminBadges = {
     owners: ownerApplications.length,
     venues: pendingVenues.length,
@@ -146,18 +150,18 @@ export const Navbar = ({ onNavigateSection }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <button
             onClick={() => onNavigateSection('hero')}
-            className="flex items-center gap-2 group text-left cursor-pointer"
+            className="flex items-center gap-2 group text-left cursor-pointer shrink-0"
           >
             <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-base tracking-tighter shadow-inner shadow-emerald-400/40 group-hover:bg-emerald-500 transition-colors">
               SB
             </div>
-            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-white font-display">
+            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-white font-display lg:hidden xl:inline">
               SanBong<span className="text-emerald-400">.vn</span>
             </span>
           </button>
 
           {role === 'player' && (
-            <nav className="hidden lg:flex items-center gap-4 xl:gap-7 text-[0.8125rem] xl:text-sm font-medium text-slate-300 whitespace-nowrap">
+            <nav className="hidden lg:flex items-center gap-3 xl:gap-5 2xl:gap-7 text-[0.8125rem] xl:text-sm font-medium text-slate-300 whitespace-nowrap">
               <button
                 onClick={() => onNavigateSection('search-pitches')}
                 className="hover:text-emerald-400 transition-colors cursor-pointer"
@@ -165,23 +169,23 @@ export const Navbar = ({ onNavigateSection }) => {
                 Tìm sân
               </button>
               <NavLink to="/keo-gap" className={navCls}>
-                <Zap className="w-3.5 h-3.5" />
+                <Zap className="w-3.5 h-3.5 hidden 2xl:block" />
                 <span>Kèo gấp giá hời</span>
               </NavLink>
               <NavLink to="/giao-huu" className={navCls}>
-                <Users className="w-3.5 h-3.5" />
+                <Users className="w-3.5 h-3.5 hidden 2xl:block" />
                 <span>Cáp kèo & Tìm đối</span>
               </NavLink>
               <NavLink to="/ghep-chan-le" className={navCls}>
-                <UserPlus className="w-3.5 h-3.5" />
+                <UserPlus className="w-3.5 h-3.5 hidden 2xl:block" />
                 <span>Ghép chân lẻ</span>
               </NavLink>
               <NavLink to="/dat-dinh-ky" className={navCls}>
-                <Calendar className="w-3.5 h-3.5" />
+                <Calendar className="w-3.5 h-3.5 hidden 2xl:block" />
                 <span>Đặt định kỳ</span>
               </NavLink>
               <NavLink to="/bang-xep-hang" className={navCls}>
-                <Trophy className="w-3.5 h-3.5" />
+                <Trophy className="w-3.5 h-3.5 hidden 2xl:block" />
                 <span>Xếp hạng</span>
               </NavLink>
               <NavLink to="/lich-cua-toi" onClick={guarded} className={navCls}>
@@ -222,7 +226,7 @@ export const Navbar = ({ onNavigateSection }) => {
             </nav>
           )}
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {isLoggedIn ? (
               <>
                 {role === 'player' && <ChatLink />}
@@ -242,7 +246,7 @@ export const Navbar = ({ onNavigateSection }) => {
                   >
                     {initialsOf(user.name)}
                   </div>
-                  <span className="hidden sm:inline lg:hidden xl:inline truncate max-w-[9rem]">
+                  <span className="hidden sm:inline lg:hidden 2xl:inline truncate max-w-[9rem]">
                     {user.name || user.phone}
                   </span>
                 </NavLink>

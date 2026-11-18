@@ -102,7 +102,7 @@ export const HomePage = ({ onNavigateSection }) => {
             <Sparkles className="w-4 h-4" />
             <span>Hệ thống đặt sân bóng thông minh:</span>
             <span className="text-slate-300 font-normal">
-              Chốt sân trong 60 giây · Giữ chỗ an toàn 5 phút · Đặt cọc chuẩn VietQR Napas
+              Chốt sân trong 60 giây · Giữ chỗ an toàn 15 phút · Đặt cọc online qua SePay
             </span>
           </div>
           <div className="flex items-center gap-4 text-slate-400 text-[0.8125rem]">
@@ -261,8 +261,8 @@ export const HomePage = ({ onNavigateSection }) => {
               </div>
               <h3 className="text-base font-bold text-white">01. Đặt sân trong 60 giây</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Xem lịch trống trực quan từng sân con, giữ chỗ 5 phút không ai tranh được, cọc online nhanh gọn qua mã
-                VietQR Napas 24/7.
+                Xem lịch trống trực quan từng sân con, giữ chỗ 15 phút không ai tranh được, cọc online nhanh gọn qua
+                SePay (thẻ ATM, Visa, QR ngân hàng) 24/7.
               </p>
             </div>
 

@@ -18,11 +18,11 @@ function validateNewPassword(password, confirm) {
 }
 
 const inputCls =
-  'w-full h-10 px-3 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-emerald-500 focus:outline-none';
-const labelCls = 'text-slate-300 font-semibold block mb-1';
+  'w-full h-12 px-4 rounded-xl border border-slate-700 bg-slate-950 text-base text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none';
+const labelCls = 'text-sm text-slate-300 font-semibold block mb-1.5';
 
 const GoogleIcon = () => (
-  <svg viewBox="0 0 48 48" className="w-4 h-4" aria-hidden="true">
+  <svg viewBox="0 0 48 48" className="w-5 h-5" aria-hidden="true">
     <path
       fill="#FFC107"
       d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"
@@ -103,7 +103,9 @@ export const AuthModal = ({ onClose }) => {
       else await requestEmailOtp(identifier);
       setOtpSent(true);
       showToast(
-        mode === 'forgot' ? 'Nếu email đã đăng ký, mã OTP đã được gửi tới hộp thư.' : 'Đã gửi mã OTP tới email của bạn.',
+        mode === 'forgot'
+          ? 'Nếu email đã đăng ký, mã OTP đã được gửi tới hộp thư.'
+          : 'Đã gửi mã OTP tới email của bạn.'
       );
     } catch (err) {
       setError(errorMessage(err));
@@ -116,7 +118,9 @@ export const AuthModal = ({ onClose }) => {
     onClose();
     if (needsProfileSetup(profile)) {
       navigate('/ho-so');
-      showToast('Chào mừng bạn! Hãy cập nhật khu vực, trình độ và vị trí sở trường để được gợi ý sân phù hợp.');
+      showToast(
+        'Chào mừng bạn! Hãy cập nhật khu vực, trình độ và vị trí sở trường để được gợi ý sân phù hợp.'
+      );
     }
   };
 
@@ -160,8 +164,13 @@ export const AuthModal = ({ onClose }) => {
   };
 
   const identifierLabel =
-    mode === 'login' ? 'Email hoặc Số điện thoại:' : mode === 'forgot' || method === 'email' ? 'Email:' : 'Số điện thoại:';
-  const identifierType = mode === 'login' ? 'text' : mode === 'forgot' || method === 'email' ? 'email' : 'tel';
+    mode === 'login'
+      ? 'Email hoặc Số điện thoại:'
+      : mode === 'forgot' || method === 'email'
+        ? 'Email:'
+        : 'Số điện thoại:';
+  const identifierType =
+    mode === 'login' ? 'text' : mode === 'forgot' || method === 'email' ? 'email' : 'tel';
   const identifierPlaceholder =
     mode === 'login'
       ? '0988xxxxxx hoặc email@domain.com'
@@ -170,247 +179,268 @@ export const AuthModal = ({ onClose }) => {
         : '0912345678';
 
   return (
-    <Modal onClose={onClose}>
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base shadow-inner">
-            SB
+    <Modal onClose={onClose} size="full">
+      <div className="min-h-dvh">
+        <div className="min-h-dvh flex items-center justify-center px-4 py-16 sm:px-8">
+          <div className="w-full max-w-md text-sm">
+            <div className="mb-8">
+              <div className="inline-flex items-center gap-2.5 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base">
+                  SB
+                </div>
+                <span className="text-2xl font-black text-white font-display">
+                  SanBong<span className="text-emerald-400">.vn</span>
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
+                {mode === 'forgot'
+                  ? 'Quên mật khẩu'
+                  : mode === 'register'
+                    ? 'Tạo tài khoản mới'
+                    : 'Chào mừng trở lại'}
+              </h1>
+              <p className="mt-2 text-base text-slate-400">
+                {mode === 'forgot'
+                  ? 'Đặt lại mật khẩu qua mã OTP gửi về email.'
+                  : mode === 'register'
+                    ? 'Đăng ký để đặt sân, cáp kèo và quản lý lịch đá.'
+                    : 'Đăng nhập để tiếp tục đặt sân của bạn.'}
+              </p>
+            </div>
+
+            {mode === 'forgot' ? (
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="inline-flex items-center gap-1.5 mb-5 text-sm font-semibold text-slate-400 hover:text-white cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Quay lại đăng nhập</span>
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl mb-6 border border-slate-800 text-sm font-semibold">
+                {[
+                  ['login', 'Đăng nhập'],
+                  ['register', 'Đăng ký tài khoản'],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => switchMode(key)}
+                    className={`py-2.5 rounded-lg transition-colors cursor-pointer ${
+                      mode === key ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Vai trò chỉ chọn khi đăng ký; khi đăng nhập lấy theo tài khoản */}
+            {mode === 'register' && (
+              <div className="mb-5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                  Chọn vai trò tài khoản:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('PLAYER')}
+                    className={`p-3.5 rounded-xl border text-center transition-all cursor-pointer ${
+                      selectedRole === 'PLAYER'
+                        ? 'bg-emerald-950 border-emerald-500 text-white font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <User className="w-5 h-5 mx-auto mb-1.5 text-emerald-400" />
+                    <div className="text-sm">Người chơi</div>
+                    <div className="text-xs text-slate-500">Đội bóng</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('OWNER')}
+                    className={`p-3.5 rounded-xl border text-center transition-all cursor-pointer ${
+                      selectedRole === 'OWNER'
+                        ? 'bg-amber-950 border-amber-500 text-white font-bold'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5 mx-auto mb-1.5 text-amber-400" />
+                    <div className="text-sm">Chủ sân</div>
+                    <div className="text-xs text-slate-500">Quản lý lịch</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 text-sm">
+              {mode === 'register' && (
+                <div>
+                  <label className={labelCls}>Họ và tên của bạn:</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nguyễn Văn A"
+                    autoComplete="name"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+              )}
+
+              {mode === 'register' && (
+                <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 font-semibold">
+                  {[
+                    ['phone', 'Số điện thoại'],
+                    ['email', 'Gmail'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => switchMethod(key)}
+                      className={`py-2 rounded-lg transition-colors cursor-pointer ${
+                        method === key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <label className={labelCls}>{identifierLabel}</label>
+                <div className="flex gap-2">
+                  <input
+                    type={identifierType}
+                    inputMode={identifierType === 'tel' ? 'numeric' : undefined}
+                    value={identifier}
+                    onChange={(e) => {
+                      setIdentifier(e.target.value);
+                      if (otpSent) setOtpSent(false);
+                    }}
+                    placeholder={identifierPlaceholder}
+                    autoComplete={needsOtp ? 'email' : 'username'}
+                    className={`${inputCls} flex-1 min-w-0`}
+                    required
+                  />
+                  {needsOtp && (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={sendingOtp}
+                      className="shrink-0 h-12 px-4 rounded-xl border border-emerald-700 text-emerald-400 hover:bg-emerald-950 disabled:opacity-60 disabled:cursor-wait font-semibold cursor-pointer"
+                    >
+                      {sendingOtp ? 'Đang gửi...' : otpSent ? 'Gửi lại' : 'Gửi mã'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {needsOtp && otpSent && (
+                <div>
+                  <label className={labelCls}>Mã OTP (6 số, gửi qua email):</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    autoComplete="one-time-code"
+                    className={`${inputCls} tracking-widest`}
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm text-slate-300 font-semibold">
+                    {mode === 'forgot' ? 'Mật khẩu mới:' : 'Mật khẩu:'}
+                  </label>
+                  {mode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode('forgot')}
+                      className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className={inputCls}
+                  required
+                />
+                {isNewPassword && (
+                  <p className="mt-1.5 text-xs text-slate-500">Ít nhất 8 ký tự, gồm cả chữ và số.</p>
+                )}
+              </div>
+
+              {isNewPassword && (
+                <div>
+                  <label className={labelCls}>Xác nhận mật khẩu:</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-wait text-white font-extrabold text-base shadow-lg shadow-emerald-950 transition-all cursor-pointer active:scale-98 mt-2"
+              >
+                {submitting
+                  ? 'Đang xử lý...'
+                  : mode === 'login'
+                    ? 'Đăng nhập vào hệ thống'
+                    : mode === 'forgot'
+                      ? 'Đặt lại mật khẩu'
+                      : 'Đăng ký tài khoản ngay'}
+              </button>
+            </form>
+
+            {mode !== 'forgot' && (
+              <>
+                <div className="flex items-center gap-3 my-6 text-sm text-slate-500">
+                  <span className="h-px flex-1 bg-slate-800" />
+                  <span>hoặc</span>
+                  <span className="h-px flex-1 bg-slate-800" />
+                </div>
+                <a
+                  href={apiClient.auth.googleLoginUrl()}
+                  className="w-full h-12 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-white text-base font-semibold flex items-center justify-center gap-2.5 transition-colors"
+                >
+                  <GoogleIcon />
+                  <span>Tiếp tục với Google</span>
+                </a>
+              </>
+            )}
           </div>
-          <span className="text-2xl font-black text-white font-display">
-            SanBong<span className="text-emerald-400">.vn</span>
-          </span>
         </div>
-        <p className="text-xs text-slate-400">
-          {mode === 'forgot' ? 'Đặt lại mật khẩu qua mã OTP gửi về email' : 'Hệ thống tài khoản và phân quyền trực tuyến'}
-        </p>
       </div>
-
-      {mode === 'forgot' ? (
-        <button
-          type="button"
-          onClick={() => switchMode('login')}
-          className="inline-flex items-center gap-1.5 mb-4 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Quay lại đăng nhập</span>
-        </button>
-      ) : (
-        <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl mb-5 border border-slate-800 text-xs font-semibold">
-          {[
-            ['login', 'Đăng nhập'],
-            ['register', 'Đăng ký tài khoản'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => switchMode(key)}
-              className={`py-2 rounded-lg transition-colors cursor-pointer ${
-                mode === key ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Vai trò chỉ chọn khi đăng ký; khi đăng nhập lấy theo tài khoản */}
-      {mode === 'register' && (
-        <div className="mb-4">
-          <label className="text-[0.8125rem] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-            Chọn vai trò tài khoản:
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('PLAYER')}
-              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                selectedRole === 'PLAYER'
-                  ? 'bg-emerald-950 border-emerald-500 text-white font-bold'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              <User className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
-              <div className="text-[0.8125rem]">Người chơi</div>
-              <div className="text-[0.6875rem] text-slate-500">Đội bóng</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedRole('OWNER')}
-              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                selectedRole === 'OWNER'
-                  ? 'bg-amber-950 border-amber-500 text-white font-bold'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              <Building2 className="w-4 h-4 mx-auto mb-1 text-amber-400" />
-              <div className="text-[0.8125rem]">Chủ sân</div>
-              <div className="text-[0.6875rem] text-slate-500">Quản lý lịch</div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} noValidate className="space-y-3.5 text-xs">
-        {mode === 'register' && (
-          <div>
-            <label className={labelCls}>Họ và tên của bạn:</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nguyễn Văn A"
-              autoComplete="name"
-              className={inputCls}
-              required
-            />
-          </div>
-        )}
-
-        {mode === 'register' && (
-          <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 font-semibold">
-            {[
-              ['phone', 'Số điện thoại'],
-              ['email', 'Gmail'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => switchMethod(key)}
-                className={`py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  method === key ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div>
-          <label className={labelCls}>{identifierLabel}</label>
-          <div className="flex gap-2">
-            <input
-              type={identifierType}
-              inputMode={identifierType === 'tel' ? 'numeric' : undefined}
-              value={identifier}
-              onChange={(e) => {
-                setIdentifier(e.target.value);
-                if (otpSent) setOtpSent(false);
-              }}
-              placeholder={identifierPlaceholder}
-              autoComplete={needsOtp ? 'email' : 'username'}
-              className={`${inputCls} flex-1 min-w-0`}
-              required
-            />
-            {needsOtp && (
-              <button
-                type="button"
-                onClick={handleSendOtp}
-                disabled={sendingOtp}
-                className="shrink-0 h-10 px-3 rounded-xl border border-emerald-700 text-emerald-400 hover:bg-emerald-950 disabled:opacity-60 disabled:cursor-wait font-semibold cursor-pointer"
-              >
-                {sendingOtp ? 'Đang gửi...' : otpSent ? 'Gửi lại' : 'Gửi mã'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {needsOtp && otpSent && (
-          <div>
-            <label className={labelCls}>Mã OTP (6 số, gửi qua email):</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
-              autoComplete="one-time-code"
-              className={`${inputCls} tracking-widest`}
-              required
-            />
-          </div>
-        )}
-
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-slate-300 font-semibold">{mode === 'forgot' ? 'Mật khẩu mới:' : 'Mật khẩu:'}</label>
-            {mode === 'login' && (
-              <button
-                type="button"
-                onClick={() => switchMode('forgot')}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
-              >
-                Quên mật khẩu?
-              </button>
-            )}
-          </div>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className={inputCls}
-            required
-          />
-          {isNewPassword && <p className="mt-1 text-slate-500">Ít nhất 8 ký tự, gồm cả chữ và số.</p>}
-        </div>
-
-        {isNewPassword && (
-          <div>
-            <label className={labelCls}>Xác nhận mật khẩu:</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className={inputCls}
-              required
-            />
-          </div>
-        )}
-
-        {error && (
-          <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-wait text-white font-extrabold text-xs shadow-lg shadow-emerald-950 transition-all cursor-pointer active:scale-98 mt-2"
-        >
-          {submitting
-            ? 'Đang xử lý...'
-            : mode === 'login'
-              ? 'Đăng nhập vào hệ thống'
-              : mode === 'forgot'
-                ? 'Đặt lại mật khẩu'
-                : 'Đăng ký tài khoản ngay'}
-        </button>
-      </form>
-
-      {mode !== 'forgot' && (
-        <>
-          <div className="flex items-center gap-3 my-4 text-[0.75rem] text-slate-500">
-            <span className="h-px flex-1 bg-slate-800" />
-            <span>hoặc</span>
-            <span className="h-px flex-1 bg-slate-800" />
-          </div>
-          <a
-            href={apiClient.auth.googleLoginUrl()}
-            className="w-full h-10 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
-          >
-            <GoogleIcon />
-            <span>Tiếp tục với Google</span>
-          </a>
-        </>
-      )}
     </Modal>
   );
 };

@@ -11,12 +11,23 @@ const SORTS = [
   ['streak', 'Chuỗi thắng'],
   ['reputation', 'Uy tín'],
 ];
+// Số lớn bên phải là chỉ số đang dùng để xếp hạng
+const METRIC = {
+  elo: { value: (t) => t.elo, unit: 'Elo' },
+  wins: { value: (t) => t.wins, unit: 'trận thắng' },
+  streak: { value: (t) => t.win_streak, unit: 'chuỗi thắng' },
+  reputation: { value: (t) => t.reputation_score, unit: 'uy tín' },
+};
 export const TOURNAMENT_STATUS = {
   OPEN: { text: 'Đang nhận đăng ký', cls: 'bg-emerald-950 text-emerald-400 border border-emerald-800' },
   ONGOING: { text: 'Đang thi đấu', cls: 'bg-amber-950 text-amber-400 border border-amber-800' },
   FINISHED: { text: 'Đã kết thúc', cls: 'bg-slate-800 text-slate-300' },
   CANCELLED: { text: 'Đã hủy', cls: 'bg-rose-950 text-rose-400 border border-rose-800' },
 };
+const REGISTRATION_CLOSED = { text: 'Hết hạn đăng ký', cls: 'bg-slate-800 text-amber-300 border border-slate-700' };
+// Giải vẫn OPEN cho tới khi BTC xếp lịch, nhưng quá hạn thì backend đã chặn đăng ký
+export const tournamentStatus = (t) =>
+  t.status === 'OPEN' && new Date(t.registration_deadline) <= new Date() ? REGISTRATION_CLOSED : TOURNAMENT_STATUS[t.status];
 export const FORMAT_LABEL = { ROUND_ROBIN: 'Đá vòng tròn', KNOCKOUT: 'Loại trực tiếp' };
 const vnd = (n) => `${Math.round(Number(n)).toLocaleString('vi-VN')}đ`;
 
@@ -31,7 +42,7 @@ export const LeaderboardPage = () => {
       icon={Trophy}
       eyebrow="Phong trào bóng đá"
       title="Bảng Xếp Hạng & Giải Đấu"
-      description="Điểm Elo tính sau mỗi trận cáp kèo khi hai đội trưởng xác nhận cùng một tỷ số."
+      description="Điểm Elo tính sau mỗi trận cáp kèo theo tỷ số chủ sân nhập."
     >
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800 sm:inline-grid">
@@ -96,6 +107,11 @@ const Ranking = () => {
         </div>
       </div>
 
+      <p className="text-xs text-slate-500">
+        Elo và số trận thắng chỉ tính từ trận cáp kèo giao hữu, theo tỷ số do chủ sân nhập sau trận. Đội chưa có trận
+        nào giữ mức khởi điểm 1000.
+      </p>
+
       {!rows ? (
         <div className="py-10 flex justify-center text-slate-400">
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -115,19 +131,24 @@ const Ranking = () => {
                 <div className="font-bold text-white truncate">{t.name}</div>
                 <div className="text-slate-500 truncate">
                   {t.district_name || 'Chưa chọn khu vực'} · {t.wins}T {t.draws}H {t.losses}B
+                  {sort !== 'elo' && ` · Elo ${t.elo}`}
                 </div>
               </div>
-              <div className="hidden sm:flex items-center gap-1 text-slate-400 w-16" title="Chuỗi thắng">
-                <Flame className="w-3.5 h-3.5 text-orange-400" />
-                {t.win_streak}
-              </div>
-              <div className="hidden sm:flex items-center gap-1 text-slate-400 w-14" title="Uy tín">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                {t.reputation_score}
-              </div>
-              <div className="text-right w-14">
-                <div className="text-base font-black text-white tabular-nums">{t.elo}</div>
-                <div className="text-[0.6875rem] text-slate-500">Elo</div>
+              {sort !== 'streak' && (
+                <div className="hidden sm:flex items-center gap-1 text-slate-400 w-16" title="Chuỗi thắng">
+                  <Flame className="w-3.5 h-3.5 text-orange-400" />
+                  {t.win_streak}
+                </div>
+              )}
+              {sort !== 'reputation' && (
+                <div className="hidden sm:flex items-center gap-1 text-slate-400 w-14" title="Uy tín">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  {t.reputation_score}
+                </div>
+              )}
+              <div className="text-right w-20">
+                <div className="text-base font-black text-white tabular-nums">{METRIC[sort].value(t)}</div>
+                <div className="text-[0.6875rem] text-slate-500">{METRIC[sort].unit}</div>
               </div>
             </div>
           ))}
@@ -160,7 +181,7 @@ const Tournaments = () => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {list.map((t) => {
-        const st = TOURNAMENT_STATUS[t.status];
+        const st = tournamentStatus(t);
         return (
           <Link key={t.id} to={`/giai-dau/${t.id}`} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-700 space-y-2 text-xs">
             <span className={`inline-block text-[0.75rem] font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.text}</span>

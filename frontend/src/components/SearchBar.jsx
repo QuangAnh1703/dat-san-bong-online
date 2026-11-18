@@ -156,7 +156,7 @@ export const SearchBar = ({ onSearchSubmit }) => {
         </div>
 
         <div className="hidden sm:flex items-center gap-3 text-slate-400 text-[0.8125rem]">
-          <span>• Giữ chỗ 5 phút</span>
+          <span>• Giữ chỗ 15 phút</span>
           <span>• Đặt cọc 20-30% online</span>
           <span>• Hoàn cọc nếu mưa bão</span>
         </div>

@@ -381,7 +381,7 @@ export const AppProvider = ({ children }) => {
       services: input.services || [],
       pay_full: !!input.payFull,
       looking_for_rival: !!input.lookingForRival,
-      deal_note: input.dealNote || undefined,
+      loser_percent: input.loserPercent || undefined,
     });
     // Response tạo đơn không kèm tên sân con -> lấy từ lựa chọn trên UI
     const booking = {
@@ -417,29 +417,6 @@ export const AppProvider = ({ children }) => {
     };
   };
 
-  const toTransfer = (t) => ({
-    bankName: t.bank_name || null,
-    bankAccount: t.bank_account || null,
-    bankHolder: t.bank_holder || null,
-    amount: Number(t.amount ?? t.deposit_amount) || 0,
-    content: t.content || `SANBONG ${t.code}`,
-    code: t.code || null,
-    venueId: t.venue_id || null,
-    venueName: t.venue_name || null,
-    status: t.status || null,
-    amountReceived: Number(t.amount_received) || 0,
-    refundPendingAmount: Number(t.refund_pending_amount) || 0,
-    holdExpiresAt: t.hold_expires_at || null,
-  });
-
-  const getTransferInfo = async (bookingCode) => toTransfer(await apiClient.bookings.getByCode(bookingCode));
-
-  const reportTransfer = async (bookingCode) => {
-    const res = await apiClient.payments.reportTransfer(bookingCode);
-    await reloadBookings();
-    showToast('Đã gửi xác nhận chuyển khoản. Chủ sân sẽ đối soát và xác nhận đơn.');
-    return toTransfer(res.transfer);
-  };
 
   const fileComplaint = async (bookingCode, subject, content) => {
     await apiClient.complaints.create({ booking_code: bookingCode, subject, content });
@@ -499,8 +476,8 @@ export const AppProvider = ({ children }) => {
     showToast('Đã gửi lời mời! Người đăng bài sẽ liên hệ lại với bạn.');
   };
 
-  const createChallenge = async (bookingDbId, dealNote, content) => {
-    await apiClient.community.createTeamPost({ booking_id: bookingDbId, deal_note: dealNote, content });
+  const createChallenge = async (bookingDbId, loserPercent, content) => {
+    await apiClient.community.createTeamPost({ booking_id: bookingDbId, loser_percent: loserPercent, content });
     await reloadChallenges();
     showToast('Đã đăng tin tìm đối lên sàn cáp kèo!');
   };
@@ -647,8 +624,6 @@ export const AppProvider = ({ children }) => {
         cancelBooking,
         rateBooking,
         leaveMatch,
-        reportTransfer,
-        getTransferInfo,
         fileComplaint,
         challenges,
         challengesLoading,

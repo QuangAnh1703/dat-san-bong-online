@@ -369,7 +369,7 @@ export const OwnerVenueFormPage = () => {
 
           <Section
             title="Đặt cọc & tài khoản nhận cọc *"
-            hint="Người chơi chuyển khoản tiền cọc vào tài khoản này (VietQR) khi giữ chỗ."
+            hint="Tài khoản nhận tiền của cụm sân (tiền cọc người chơi thanh toán qua SePay)."
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
