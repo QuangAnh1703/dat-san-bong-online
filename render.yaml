@@ -23,7 +23,8 @@ services:
     plan: free
     region: singapore
     rootDir: backend
-    buildCommand: npm ci --omit=dev
+    # package-lock.json nam trong .gitignore -> khong dung duoc npm ci
+    buildCommand: npm install --omit=dev
     # Goi free khong co pre-deploy command -> chay migration ngay truoc khi start
     startCommand: npm run migrate && npm start
     healthCheckPath: /health
