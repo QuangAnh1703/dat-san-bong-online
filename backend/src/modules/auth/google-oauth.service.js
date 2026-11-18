@@ -16,6 +16,11 @@ function initGoogleOAuth() {
     console.log('✅ Google OAuth: Using MOCK mode (development)');
     return;
   }
+  // Production thieu cau hinh: chi tat dang nhap Google (route tra GOOGLE_OAUTH_NOT_CONFIGURED), khong lam sap server
+  if (useMock) {
+    console.warn('[google] chua cau hinh GOOGLE_OAUTH_CLIENT_ID/SECRET -> tat dang nhap Google');
+    return;
+  }
 
   // Real Google OAuth
   passport.use(
