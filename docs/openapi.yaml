@@ -184,17 +184,17 @@ paths:
   /api/auth/request-otp:
     post:
       tags: [Xac thuc]
-      summary: Yeu cau ma OTP de dang ky
-      description: Gui OTP ve SMS (demo hien thi trong log). Con lai 15 phut.
+      summary: Yeu cau ma OTP de dang ky bang email
+      description: Gui OTP ve email. Con lai 15 phut.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [phone]
+              required: [email]
               properties:
-                phone: { type: string, example: '0912345678' }
+                email: { type: string, format: email, example: 'user@example.com' }
       responses:
         '200':
           description: OTP gui thanh cong
@@ -203,14 +203,16 @@ paths:
               schema:
                 type: object
                 properties:
-                  message: { type: string, example: 'OTP sent' }
-                  phone:   { type: string, example: '5678', description: '4 chu so cuoi cua SDT' }
+                  message: { type: string, example: 'OTP sent to email' }
+                  email:   { type: string, example: '*@example.com', description: 'Email da an dau co diem' }
         '400':
-          description: SDT sai dinh dang hoac khong hop le
+          description: Email sai dinh dang (`INVALID_EMAIL`)
         '409':
-          description: SDT da duoc dang ky (`PHONE_TAKEN`)
+          description: Email da duoc dang ky (`EMAIL_TAKEN`)
         '429':
           description: Nhap sai qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+        '503':
+          description: Khong gui duoc email (`EMAIL_SEND_FAILED`), vd. may chu chan cong SMTP va chua cau hinh Brevo
 
   /api/auth/verify-otp:
     post:
@@ -301,6 +303,8 @@ paths:
           description: Email sai dinh dang (`INVALID_EMAIL`)
         '429':
           description: Yeu cau qua nhieu, da khoa (`OTP_RATE_LIMITED`)
+        '503':
+          description: Khong gui duoc email (`EMAIL_SEND_FAILED`)
 
   /api/auth/verify-reset-otp:
     post:

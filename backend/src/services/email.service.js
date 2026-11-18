@@ -15,12 +15,16 @@ async function initializeEmail() {
   }
   if (transporter) return;
 
+  // Co timeout de khi cong SMTP bi chan (Render free) thi bao loi nhanh thay vi treo request
   transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   // Test connection
@@ -37,6 +41,7 @@ async function initializeEmail() {
 async function sendViaBrevo({ to, subject, html, attachments = [] }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
+    signal: AbortSignal.timeout(15000),
     headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
       sender: { email: fromAddress(), name: 'SanBong.vn' },

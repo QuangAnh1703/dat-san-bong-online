@@ -104,6 +104,7 @@ const ERRORS = {
   NOT_IMPLEMENTED: { status: 501, message: 'Chuc nang chua duoc trien khai' },
   PAYMENT_GATEWAY_NOT_CONFIGURED: { status: 503, message: 'Cổng thanh toán chưa được cấu hình' },
   CHATBOT_NOT_CONFIGURED: { status: 503, message: 'Trợ lý đặt sân chưa được cấu hình' },
+  EMAIL_SEND_FAILED: { status: 503, message: 'Không gửi được email, vui lòng thử lại sau hoặc đăng ký bằng số điện thoại' },
   CHATBOT_UNAVAILABLE: { status: 502, message: 'Trợ lý đặt sân đang bận, vui lòng thử lại sau' },
   GOOGLE_OAUTH_NOT_CONFIGURED: { status: 503, message: 'Dang nhap Google chua duoc cau hinh' },
 };

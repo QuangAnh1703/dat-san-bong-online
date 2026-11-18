@@ -77,11 +77,20 @@ Render free chặn cổng SMTP nên Gmail không gửi được. Server vẫn ch
 - Nâng `sanbong-api` lên gói Starter (7 USD/tháng): mở SMTP, điền `GMAIL_USER` và `GMAIL_APP_PASSWORD` như ở máy.
 - Brevo (miễn phí 300 mail/ngày, gửi qua HTTP): xác minh email người gửi, tạo API key, điền `BREVO_API_KEY` và `EMAIL_FROM`.
 
-## Gắn tên miền riêng (khi có)
+## Tên miền sanbong.id.vn
 
-- Vercel → Settings → Domains → thêm `sanbong.vn`, tạo bản ghi DNS theo hướng dẫn.
-- Render → `sanbong-api` → Settings → Custom Domains → thêm `api.sanbong.vn` (CNAME).
-- Cập nhật: `VITE_API_URL` (rồi redeploy Vercel), `CORS_ORIGIN`, `FRONTEND_URL`, `BACKEND_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, Google Console, webhook SePay.
+| Địa chỉ | Trỏ tới | Bản ghi DNS (iNET) |
+|---|---|---|
+| `www.sanbong.id.vn` (chính) | Vercel | `CNAME www` → giá trị Vercel đưa (`...vercel-dns-017.com`) |
+| `sanbong.id.vn` | Vercel, tự chuyển 308 sang `www` | `A @` → `216.198.79.1`, **tắt "Bảo vệ"** của iNET (bật thì trỏ sang máy chủ chống DDoS, Vercel không cấp được HTTPS) |
+| `api.sanbong.id.vn` | Render `sanbong-api` | `CNAME api` → `sanbong-api.onrender.com` |
+
+Cấu hình đi kèm:
+
+- Vercel: `VITE_API_URL=https://api.sanbong.id.vn` (kiểu **Config**, không phải Secret — biến `VITE_` lộ ra trình duyệt), đổi xong phải Redeploy.
+- Render: `CORS_ORIGIN=https://www.sanbong.id.vn,https://sanbong.id.vn,https://dat-san-bong-online.vercel.app`, `FRONTEND_URL=https://www.sanbong.id.vn`, `BACKEND_URL=https://api.sanbong.id.vn`, `GOOGLE_OAUTH_REDIRECT_URI=https://api.sanbong.id.vn/api/auth/google/callback`.
+- Google Console (client SanBong1): origins `https://www.sanbong.id.vn`, `https://sanbong.id.vn`; redirect `https://api.sanbong.id.vn/api/auth/google/callback`.
+- SePay webhook: `https://api.sanbong.id.vn/api/payments/sepay/webhook`, API Key = `SEPAY_WEBHOOK_API_KEY`, bật tự gửi lại khi lỗi (backend free ngủ ~50 giây).
 
 ## Lỗi thường gặp
 

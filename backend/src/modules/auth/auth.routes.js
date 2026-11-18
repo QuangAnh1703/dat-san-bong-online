@@ -60,6 +60,7 @@ function verifyTempToken(token, purpose) {
 
 function mapOtpError(err) {
   if (err.message === 'OTP_EXPIRED') return new AppError('OTP_EXPIRED');
+  if (err.message === 'EMAIL_SEND_FAILED') return new AppError('EMAIL_SEND_FAILED');
   if (err.message.startsWith('OTP_LOCKED')) {
     return new AppError('OTP_RATE_LIMITED', { details: { retry_after: parseInt(err.message.split('_')[2], 10) } });
   }

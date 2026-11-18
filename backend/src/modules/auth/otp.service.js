@@ -40,7 +40,11 @@ async function storeOtp(contact, purpose = 'REGISTER') {
 
   if (isEmail) {
     // Send email
-    await sendOtpEmail(contact, otp);
+    try {
+      await sendOtpEmail(contact, otp);
+    } catch {
+      throw new Error('EMAIL_SEND_FAILED');
+    }
     console.log(`[OTP] Sent to email ${contact}`);
   } else {
     // Mock SMS for phone (in production, integrate with SMS service)
