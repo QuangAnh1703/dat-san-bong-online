@@ -2,8 +2,20 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessage, needsProfileSetup, useApp } from '../context/AppContext';
 import { apiClient } from '../services/api';
-import { User, Building2, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+  User,
+  Building2,
+  AlertCircle,
+  ArrowLeft,
+  CalendarCheck,
+  QrCode,
+  Swords,
+  LayoutDashboard,
+  Wallet,
+  BellRing,
+} from 'lucide-react';
 import { Modal } from './ui/Modal';
+import heroImg from '../assets/images/hero_football_pitch_1790752166238.jpg';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^0[35789][0-9]{8}$/;
@@ -20,6 +32,20 @@ function validateNewPassword(password, confirm) {
 const inputCls =
   'w-full h-12 px-4 rounded-xl border border-slate-700 bg-slate-950 text-base text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none';
 const labelCls = 'text-sm text-slate-300 font-semibold block mb-1.5';
+
+// Panel ảnh bên trái nói lợi ích theo vai trò đang chọn khi đăng ký
+const HIGHLIGHTS = {
+  PLAYER: [
+    [CalendarCheck, 'Xem lịch trống, đặt sân 24/7', 'Giữ chỗ ngay, không cần gọi điện hỏi chủ sân.'],
+    [QrCode, 'Đặt cọc bằng VietQR', 'Chuyển khoản xong là đơn tự xác nhận.'],
+    [Swords, 'Cáp kèo & ghép chân lẻ', 'Tìm đối giao hữu, tuyển thêm người cho trận.'],
+  ],
+  OWNER: [
+    [LayoutDashboard, 'Quản lý lịch sân một nơi', 'Theo dõi đơn đặt, khoá ca, chỉnh bảng giá.'],
+    [Wallet, 'Nhận cọc tự động', 'Tiền về tài khoản, đơn tự xác nhận qua SePay.'],
+    [BellRing, 'Lấp đầy giờ trống', 'Mở kèo gấp giá hời cho các ca còn trống.'],
+  ],
+};
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 48 48" className="w-5 h-5" aria-hidden="true">
@@ -178,21 +204,66 @@ export const AuthModal = ({ onClose }) => {
         ? 'ban@gmail.com'
         : '0912345678';
 
+  const isOwner = mode === 'register' && selectedRole === 'OWNER';
+  const highlights = HIGHLIGHTS[isOwner ? 'OWNER' : 'PLAYER'];
+
+  const logo = (
+    <div className="inline-flex items-center gap-2.5">
+      <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base">
+        SB
+      </div>
+      <span className="text-2xl font-black text-white font-display">
+        SanBong<span className="text-emerald-400">.vn</span>
+      </span>
+    </div>
+  );
+
   return (
     <Modal onClose={onClose} size="full">
-      <div className="min-h-dvh">
-        <div className="min-h-dvh flex items-center justify-center px-4 py-16 sm:px-8">
-          <div className="w-full max-w-md text-sm">
+      <div className="min-h-dvh lg:grid lg:grid-cols-2">
+        {/* Ảnh: mobile là dải banner trên cùng, desktop là nửa trái đứng yên khi form cuộn */}
+        <aside className="relative h-44 sm:h-56 lg:h-dvh lg:sticky lg:top-0 overflow-hidden">
+          <img src={heroImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-[#0b130e]/60 to-[#0b130e] lg:bg-gradient-to-br lg:from-black/40 lg:via-[#0b130e]/70 lg:to-[#0b130e]/95" />
+          <div className="relative h-full flex flex-col justify-end lg:justify-between px-4 pb-4 sm:px-8 lg:p-12 xl:p-16">
+            {logo}
+            <div className="hidden lg:block max-w-lg">
+              <p
+                className={`text-xs font-bold uppercase tracking-wider mb-3 ${isOwner ? 'text-amber-400' : 'text-emerald-400'}`}
+              >
+                {isOwner ? 'Dành cho chủ sân' : 'Nền tảng đặt sân bóng đá'}
+              </p>
+              <h2 className="text-4xl xl:text-5xl font-black text-white font-display leading-tight">
+                {isOwner ? 'Sân kín lịch, quản lý nhẹ tênh.' : 'Ra sân dễ hơn, đá bóng nhiều hơn.'}
+              </h2>
+              <ul className="mt-8 space-y-5">
+                {highlights.map(([Icon, title, text]) => (
+                  <li key={title} className="flex gap-4">
+                    <span
+                      className={`w-11 h-11 shrink-0 rounded-xl border flex items-center justify-center ${
+                        isOwner
+                          ? 'bg-amber-950/60 border-amber-800 text-amber-400'
+                          : 'bg-emerald-950/60 border-emerald-800 text-emerald-400'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </span>
+                    <span>
+                      <span className="block text-base font-bold text-white">{title}</span>
+                      <span className="block text-sm text-slate-400">{text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="hidden lg:block text-xs text-slate-500">© SanBong.vn</p>
+          </div>
+        </aside>
+
+        <div className="flex items-start lg:items-center justify-center px-4 pt-6 pb-16 sm:px-8 lg:px-12 lg:py-16">
+          <div className="w-full max-w-xl text-sm">
             <div className="mb-8">
-              <div className="inline-flex items-center gap-2.5 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base">
-                  SB
-                </div>
-                <span className="text-2xl font-black text-white font-display">
-                  SanBong<span className="text-emerald-400">.vn</span>
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white font-display">
                 {mode === 'forgot'
                   ? 'Quên mật khẩu'
                   : mode === 'register'
@@ -247,7 +318,7 @@ export const AuthModal = ({ onClose }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedRole('PLAYER')}
-                    className={`p-3.5 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`p-4 sm:p-5 rounded-xl border text-center transition-all cursor-pointer ${
                       selectedRole === 'PLAYER'
                         ? 'bg-emerald-950 border-emerald-500 text-white font-bold'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -261,7 +332,7 @@ export const AuthModal = ({ onClose }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedRole('OWNER')}
-                    className={`p-3.5 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`p-4 sm:p-5 rounded-xl border text-center transition-all cursor-pointer ${
                       selectedRole === 'OWNER'
                         ? 'bg-amber-950 border-amber-500 text-white font-bold'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -356,49 +427,51 @@ export const AuthModal = ({ onClose }) => {
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm text-slate-300 font-semibold">
-                    {mode === 'forgot' ? 'Mật khẩu mới:' : 'Mật khẩu:'}
-                  </label>
-                  {mode === 'login' && (
-                    <button
-                      type="button"
-                      onClick={() => switchMode('forgot')}
-                      className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
-                    >
-                      Quên mật khẩu?
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  className={inputCls}
-                  required
-                />
-                {isNewPassword && (
-                  <p className="mt-1.5 text-xs text-slate-500">Ít nhất 8 ký tự, gồm cả chữ và số.</p>
-                )}
-              </div>
-
-              {isNewPassword && (
+              <div className={isNewPassword ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''}>
                 <div>
-                  <label className={labelCls}>Xác nhận mật khẩu:</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm text-slate-300 font-semibold">
+                      {mode === 'forgot' ? 'Mật khẩu mới:' : 'Mật khẩu:'}
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => switchMode('forgot')}
+                        className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
+                      >
+                        Quên mật khẩu?
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    autoComplete="new-password"
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     className={inputCls}
                     required
                   />
+                  {isNewPassword && (
+                    <p className="mt-1.5 text-xs text-slate-500">Ít nhất 8 ký tự, gồm cả chữ và số.</p>
+                  )}
                 </div>
-              )}
+
+                {isNewPassword && (
+                  <div>
+                    <label className={labelCls}>Xác nhận mật khẩu:</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      className={inputCls}
+                      required
+                    />
+                  </div>
+                )}
+              </div>
 
               {error && (
                 <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-300 flex items-start gap-2">
