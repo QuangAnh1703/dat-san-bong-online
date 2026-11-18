@@ -1,0 +1,60 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> chon repo nay.
+# CSDL (Neon) va Redis (Upstash) tao rieng, dan URL vao cac bien sync: false.
+services:
+  - type: web
+    name: sanbong-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    # Goi free khong co pre-deploy command -> chay migration ngay truoc khi start
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: NODE_ENV
+        value: production
+      - key: HOLD_MINUTES
+        value: "15"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES
+        value: 7d
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SEPAY_BANK_CODE
+        sync: false
+      - key: SEPAY_BANK_ACCOUNT
+        sync: false
+      - key: SEPAY_BANK_HOLDER
+        sync: false
+      - key: SEPAY_WEBHOOK_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false

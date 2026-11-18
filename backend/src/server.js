@@ -41,6 +41,8 @@ async function completeFinishedBookings(db) {
 }
 
 const app = express();
+// Sau proxy cua Render/Vercel: req.ip lay IP that cua khach (dung cho gioi han tan suat chatbot)
+app.set('trust proxy', 1);
 
 // Frontend chay o cong khac (Vite: 5173) -> phai bat CORS
 const ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
@@ -73,9 +75,9 @@ const PORT = Number(process.env.PORT || 3000);
   try {
     await initializeEmail();
   } catch (err) {
+    // Khong tat server: chi cac chuc nang gui mail (OTP email, xuat bao cao) bi anh huong
     console.error('[email] error: %s', err.message);
-    console.error('[email] check GMAIL_USER and GMAIL_APP_PASSWORD in .env');
-    process.exit(1);
+    console.error('[email] check BREVO_API_KEY/EMAIL_FROM hoac GMAIL_USER/GMAIL_APP_PASSWORD in .env');
   }
   try {
     await validateSchema();

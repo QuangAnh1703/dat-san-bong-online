@@ -3,7 +3,16 @@ const nodemailer = require('nodemailer');
 
 let transporter;
 
+// Render goi free chan cong SMTP -> co BREVO_API_KEY thi gui qua HTTP API cua Brevo thay vi Gmail SMTP
+const useBrevo = () => Boolean(process.env.BREVO_API_KEY);
+const fromAddress = () => process.env.EMAIL_FROM || process.env.GMAIL_USER;
+
 async function initializeEmail() {
+  if (useBrevo()) {
+    if (!fromAddress()) throw new Error('thieu EMAIL_FROM (email nguoi gui da xac minh tren Brevo)');
+    console.log('[email] dung Brevo HTTP API, nguoi gui %s', fromAddress());
+    return;
+  }
   if (transporter) return;
 
   transporter = nodemailer.createTransport({
@@ -19,16 +28,38 @@ async function initializeEmail() {
     await transporter.verify();
     console.log('[email] Gmail configured successfully');
   } catch (err) {
+    transporter = undefined;
     console.error('[email] Gmail config error:', err.message);
     throw err;
   }
 }
 
-async function sendOtpEmail(email, otp) {
-  if (!transporter) await initializeEmail();
+async function sendViaBrevo({ to, subject, html, attachments = [] }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      sender: { email: fromAddress(), name: 'SanBong.vn' },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      ...(attachments.length && {
+        attachment: attachments.map((a) => ({ name: a.filename, content: Buffer.from(a.content).toString('base64') })),
+      }),
+    }),
+  });
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${await res.text()}`);
+  return res.json();
+}
 
+async function sendMail(mail) {
+  if (useBrevo()) return sendViaBrevo(mail);
+  if (!transporter) await initializeEmail();
+  return transporter.sendMail({ from: fromAddress(), ...mail });
+}
+
+async function sendOtpEmail(email, otp) {
   const mailOptions = {
-    from: process.env.GMAIL_USER,
     to: email,
     subject: 'Mã xác minh OTP - SanBong.vn',
     html: `
@@ -51,7 +82,7 @@ async function sendOtpEmail(email, otp) {
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = await sendMail(mailOptions);
     console.log(`[email] OTP sent to ${email}`);
     return info;
   } catch (err) {
@@ -62,9 +93,7 @@ async function sendOtpEmail(email, otp) {
 
 /** Gui email kem file dinh kem (vd. bao cao xuat nen cho Admin) */
 async function sendMailWithAttachment({ to, subject, html, filename, content }) {
-  if (!transporter) await initializeEmail();
-  return transporter.sendMail({
-    from: process.env.GMAIL_USER,
+  return sendMail({
     to,
     subject,
     html,
