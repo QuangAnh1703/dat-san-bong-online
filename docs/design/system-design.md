@@ -99,6 +99,7 @@ backend/src/
 | `/api/notifications` | `notifications` | Hộp thông báo của người dùng |
 | `/api/complaints` | `complaints` | Người chơi gửi khiếu nại |
 | `/api/admin` | `admin` | Duyệt chủ sân / cụm sân, người dùng, khiếu nại, báo cáo |
+| `/api/chatbot`, `/api/admin/knowledge` | `chatbot` | Trợ lý chat (DeepSeek + RAG), quản trị kho tri thức (mục 12.4) |
 
 ### 2.3 Một request đi qua những gì
 
@@ -230,8 +231,8 @@ thì các đơn đó chuyển `CANCELLED_BY_OWNER`, nhả slot và báo cho ngư
 ```mermaid
 stateDiagram-v2
     [*] --> HELD: đặt sân (giữ chỗ HOLD_MINUTES)
-    HELD --> PENDING_VERIFY: người đặt báo đã chuyển cọc
-    HELD --> CONFIRMED: chủ sân xác nhận
+    HELD --> PENDING_VERIFY: (dữ liệu cũ) báo đã chuyển khoản
+    HELD --> CONFIRMED: SePay báo đã thanh toán / chủ sân xác nhận
     PENDING_VERIFY --> CONFIRMED: chủ sân đối soát
     HELD --> CANCELLED_EXPIRED: quá hạn giữ chỗ (job nền)
     HELD --> CANCELLED_BY_USER: người đặt hủy
@@ -279,23 +280,18 @@ Thời gian lưu dạng `TSTZRANGE` (giờ bắt đầu bao gồm, giờ kết t
   Giá luôn tính ở server — không tin giá client gửi lên (kể cả dịch vụ cộng thêm).
 - **Đặt định kỳ**: một `booking` loại `RECURRING` nhiều slot + `recurring_contract`, chiết khấu theo gói.
 - **Cọc**: `deposit_amount = total × venue.deposit_rate` (mặc định 30%), hoặc trả đủ nếu `pay_full`.
-- **Thanh toán** có hai cách:
-  - **VNPay** (`/api/payments/vnpay`, `services/vnpay.service.js`): tạo `payment` `VNPAY` `PENDING` với `provider_ref` = `vnp_TxnRef`,
-    hạn giao dịch = hạn giữ chỗ. VNPay gọi về `return` (trình duyệt) và `ipn` (server-to-server); cả hai dùng chung một hàm:
-    kiểm chữ ký HMAC-SHA512 + số tiền, ghi `payment_transaction` (UNIQUE chống xử lý trùng), thành công → payment `SUCCESS`,
-    đơn `CONFIRMED`, slot `CONFIRMED`, báo người đặt + chủ sân. Tiền về khi đơn đã hết hạn → ghi nhận, báo người đặt gửi khiếu nại.
-    Chưa cấu hình `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` (dev) → trang cổng giả lập `/api/payments/vnpay/mock`, vẫn ký / kiểm chữ ký thật.
-  - **Chuyển khoản VietQR, tự đối soát** (`/api/payments/bank`, `services/bank-match.service.js`, PRD 2.3.4): chuyển vào tài khoản
-    của cụm sân, nội dung `SANBONG <mã đơn>`. Webhook biến động số dư (định dạng SePay, header `Authorization: Apikey`) ghi
-    `bank_transaction` (UNIQUE `provider` + `provider_txn_id` chống xử lý trùng), bóc mã đơn rồi khớp:
-    đủ cọc → đơn `CONFIRMED` + payment `SUCCESS`; thiếu → đơn giữ `HELD`, gia hạn giữ chỗ ≥ 5 phút, báo số tiền thiếu;
-    không có mã / sai tài khoản nhận / đơn đã xác nhận → `UNMATCHED` (hàng đợi `/chu-san/doi-soat`, `/quan-tri/doi-soat`,
-    chủ sân / admin gán tay vào đơn hoặc đánh dấu đã hoàn); đơn hết hạn mà slot còn trống → giữ lại đơn, đã có người đặt đè
-    hoặc đơn bị hủy → `REFUND_PENDING`. Số tiền đã nhận của đơn = tổng `bank_transaction` `PARTIAL` + `APPLIED` (không lưu cột riêng).
-    Chưa cấu hình `BANK_WEBHOOK_API_KEY` (dev) → bật `/api/payments/bank/mock-transfer` để giả lập ngân hàng báo có.
-  - **Báo chuyển khoản thủ công** (dự phòng khi tiền chưa về): bấm báo đã chuyển → `payment` `PENDING` + đơn `PENDING_VERIFY`
-    → chủ sân đối soát → đơn `CONFIRMED`, payment `SUCCESS`.
-  - MoMo / ZaloPay có trong enum nhưng chưa tích hợp.
+- **Thanh toán cọc: VietQR + webhook ngân hàng SePay** (`/api/payments/sepay`, `services/sepay.service.js`, `payment_method` + `SEPAY` V27):
+  ô thanh toán hiện ngay ảnh QR (qr.sepay.vn) chuyển vào **một tài khoản của nền tảng** đã liên kết SePay (`SEPAY_BANK_*`),
+  nội dung = mã đơn. SePay gọi `POST /api/payments/sepay/webhook` (header `Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>`) khi
+  tiền về: tìm mã `BK…` trong `code` + `content`, mỗi đơn một `payment` `SEPAY`, mỗi lần chuyển một `payment_transaction`
+  (UNIQUE `provider` + `provider_txn_no` = id giao dịch SePay → gửi lại không cộng trùng). Cộng dồn: đủ cọc →
+  `deposit.service.settlePaidDeposit` (payment `SUCCESS`, đơn + slot `CONFIRMED`, báo người đặt + chủ sân); thiếu → báo số tiền còn
+  thiếu, QR tự đổi sang số còn lại; đơn đã hết hạn → báo người đặt gửi khiếu nại. Giao dịch không có mã đơn chỉ ghi log.
+  Frontend gọi `GET /api/payments/sepay/:code` mỗi 4 giây. Chưa cấu hình `SEPAY_WEBHOOK_API_KEY` → webhook luôn bị từ chối,
+  QR vẫn hiện nhưng đơn không tự xác nhận.
+- Cổng checkout SePay (chuyển sang trang SePay, IPN) đã thử rồi bỏ vì không hiện được QR trên web (chặn iframe, không có API QR).
+- VNPay, chuyển khoản vào tài khoản riêng từng cụm sân + trang đối soát, báo chuyển khoản thủ công **đã gỡ**. Bảng `bank_transaction`,
+  giá trị enum `VNPAY`/`BANK_TRANSFER`/`WALLET` và trạng thái `PENDING_VERIFY` vẫn còn cho dữ liệu cũ.
 
 ---
 
@@ -346,7 +342,7 @@ Trong `server.js`, một `setInterval` 60 giây (tiến trình API) chạy lần
 | `restockCancelled()` | Món đặt kèm của đơn hết hạn / hủy → trả lại kho (một lần) |
 | `remindOverdue()` | Phần chia tiền quá hạn nhắc → nhắc thành viên + báo đội trưởng |
 | `refundCancelledWalletPayments()` | Đơn hết hạn / hủy đã trừ ví hội viên → hoàn lại ví |
-| `voidExpiredDisputes()` | Xung đột tỷ số cáp kèo quá 12 tiếng → `VOID`, không tính Elo |
+| `remindMatchResults()` | Trận cáp kèo kết thúc 10 phút chưa có tỷ số → nhắc chủ sân nhập; trận giải chưa có kết quả → nhắc BTC |
 
 Ngoài vòng 60 giây: xuất báo cáo admin > 366 ngày chạy nền (`setImmediate` sau khi trả 202) rồi gửi file CSV qua email.
 
@@ -411,10 +407,9 @@ frontend/src/
 | Thời gian giữ chỗ thực tế là `HOLD_MINUTES` (mặc định **15 phút**), PRD và một số comment ghi 5 phút | Tài liệu và hành vi lệch nhau | Chốt một con số, cập nhật PRD / comment |
 | `checkPermission()` cho qua route không có trong bảng | Dễ quên bảo vệ route mới | Route mới luôn gắn `requireAuthenticated` / `requireRole` trực tiếp |
 | Job nền chạy trong tiến trình API | Nhiều instance → chạy lặp, thông báo trùng | Tách worker riêng hoặc dùng advisory lock khi scale |
-| Chưa tích hợp MoMo / ZaloPay | Chỉ VNPay và chuyển khoản | Làm theo khuôn của `vnpay.service.js` + `vnpay.routes.js` |
+| Chỉ thu tiền cọc qua SePay | Gói hội viên, lệ phí giải chưa thu được online (nút mua / đăng ký giải có phí đang khóa) | Tạo đơn SePay cho `wallet_topup` / `tournament_team` theo khuôn `sepay.routes.js` |
 | Thông báo dựa vào polling 60 giây | Trễ tới 1 phút | WebSocket / SSE khi cần real-time thật |
 | Hoàn tiền (`REFUND_PENDING`) chỉ là đánh dấu, chủ sân / admin tự chuyển trả ngoài hệ thống | Không có bằng chứng hoàn tiền trong hệ thống | Lưu mã giao dịch hoàn / tích hợp API chi hộ |
-| Webhook chỉ hỗ trợ định dạng SePay | Đổi nhà cung cấp phải viết lại phần đọc payload | Tách bộ chuyển đổi payload theo nhà cung cấp trong `bank.routes.js` |
 | `csdl/db/all_in_one.sql` chỉ tới V10 | Dựng DB bằng file này sẽ thiếu V11–V16 | Dùng `npm run migrate`, hoặc cập nhật lại file |
 | Đăng ký SĐT không có OTP (chưa tích hợp SMS) | Tài khoản SĐT ở trạng thái `PENDING_VERIFY`, không xác minh được số | Tích hợp nhà cung cấp SMS, dùng lại `otp.service` |
 | Google OAuth chế độ mock (dev) cho đăng nhập bằng email bất kỳ, kể cả email admin | Chỉ chạy khi `NODE_ENV !== 'production'` và chưa cấu hình `GOOGLE_OAUTH_*` | Không bật mock ở môi trường dùng chung |
@@ -427,21 +422,11 @@ frontend/src/
 
 PRD bổ sung 2.1.8, 2.1.9, 2.2.5, 2.2.6, 2.3.4 — đã cài. Luồng: [`flows.md`](flows.md) mục 1.8, 1.9, 2.5, 2.6, 3.4.
 
-### 12.1 Một cửa gạch nợ cho mọi khoản chuyển khoản
+### 12.1 Thu tiền
 
-Mọi tiền vào đi qua `bank_transaction` (webhook hoặc API giả lập, mục 6). `bank-match.service.parseTarget()` đọc nội dung
-chuyển khoản (bỏ dấu cách, viết hoa) theo thứ tự:
-
-| Nội dung | Gạch nợ cho | Xử lý ở |
-|---|---|---|
-| `QUY <mã trận> <SĐT>` | Phần chia tiền của một thành viên | `split.service.applyShareTransfer` |
-| `NAP <mã NP…>` | Lệnh mua gói hội viên | `wallet.service.applyTopup` |
-| `GIAI <mã GI…>` | Lệ phí giải của một đội | `tournament.service.applyFee` |
-| `SANBONG <mã BK…>` | Tiền cọc đơn đặt sân | `bank-match.service.applyToBooking` |
-
-Mỗi nhánh tự kiểm tra tài khoản nhận (cụm sân / đội trưởng) và số tiền; không khớp → `UNMATCHED` (hàng đợi đối soát tay),
-không còn hiệu lực → `REFUND_PENDING`. Cột `booking_id` / `split_share_id` / `topup_id` / `tournament_id` cho biết giao dịch
-đã gạch vào đâu (`ck_bank_txn_target`). Số tiền đã nhận của đơn = chuyển khoản khớp đơn + `payment` `WALLET` `SUCCESS`.
+Gạch nợ chuyển khoản tự động (webhook VietQR, nội dung `QUY` / `NAP` / `GIAI` / `SANBONG`) đã gỡ cùng VietQR. Hiện tại:
+tiền cọc thu qua SePay (mục 6); chia tiền trận do thành viên chuyển thẳng cho đội trưởng, đội trưởng bấm "Đã nhận";
+mua gói hội viên và lệ phí giải chưa có cách thu online.
 
 ### 12.2 Dữ liệu & quy tắc
 
@@ -449,11 +434,11 @@ không còn hiệu lực → `REFUND_PENDING`. Cột `booking_id` / `split_share
 |---|---|---|---|
 | POS & kho (2.2.5) | `owner/pos.routes.js`, `services/inventory.service.js` | `venue_service.category/stock`, `booking_service.quantity`, `service_order(_item)`, `booking.checked_out_at` (V20), `booking.services_restocked` (V24) | Trừ kho bằng `UPDATE … WHERE stock >= n` + `ck_service_stock`; hết hàng ẩn khỏi trang đặt sân. Đơn hết hạn / hủy → job trả kho một lần. Check-out đơn có đồ `RENTAL` bắt buộc xác nhận đã trả đồ (`RENTAL_CHECK_REQUIRED`), trả đủ thì cộng lại kho. Báo cáo có `service_revenue` tách tiền sân |
 | Sổ quỹ (2.1.8) | `teams/split.routes.js`, `services/split.service.js` | `split_bill`, `split_bill_share`, `team.fund_balance`, `team_fund_log` (V21) | Đội trưởng = người đặt. Chia đều / tài trợ % làm tròn **lên** hàng nghìn, tiền thừa vào quỹ đội khi cả đội đóng đủ. Thành viên định danh bằng SĐT (đội phủi không cần tài khoản). Quá hạn nhắc → job nhắc mỗi người một lần + báo đội trưởng; đội trưởng "Đã nhận", "Đóng thay", "Đổi người" |
-| Ví hội viên (2.2.6) | `wallets/wallet.routes.js`, `services/wallet.service.js` | `membership_plan`, `member_wallet`, `wallet_txn`, `wallet_topup`, `payment_method` + `WALLET` (V22) | Một ví / người / cụm sân, `ck_wallet_balance >= 0`. Trả bằng ví: giảm % gói trên **tiền sân** (giữ tỉ lệ cọc), thiếu thì phần còn lại VietQR. Đơn hết hạn / hủy → job hoàn ví. Khóa chủ sân → ví còn tiền `FROZEN`, báo admin (`/quan-tri/vi-hoi-vien`) |
-| Elo (2.1.9) | `leagues/league.routes.js`, `services/tournament.service.js` | `team.elo/wins/draws/losses/win_streak`, `match_result` (V23) | Chỉ trận cáp kèo đã `MATCHED`, đã qua giờ kết thúc. Hai đội trưởng nhập; khớp → Elo (K = 32 × (0,5 + 0,5 × uy tín/100)); lệch → `DISPUTED` 12 tiếng → job `VOID` |
+| Ví hội viên (2.2.6) | `wallets/wallet.routes.js`, `services/wallet.service.js` | `membership_plan`, `member_wallet`, `wallet_txn`, `wallet_topup`, `payment_method` + `WALLET` (V22) | Một ví / người / cụm sân, `ck_wallet_balance >= 0`. Mua gói / trả cọc bằng ví tạm gỡ (chỉ thanh toán SePay); job vẫn hoàn ví cho đơn cũ đã trả bằng ví bị hết hạn / hủy. Khóa chủ sân → ví còn tiền `FROZEN`, báo admin (`/quan-tri/vi-hoi-vien`) |
+| Elo (2.1.9) | `leagues/league.routes.js`, `services/tournament.service.js` | `team.elo/wins/draws/losses/win_streak`, `match_result` (V23) | Chỉ trận cáp kèo đã `MATCHED`, đã qua giờ kết thúc. Chủ sân nơi diễn ra trận (hoặc admin) nhập tỷ số trong 14 ngày → chốt ngay `CONFIRMED`, tính Elo (K = 32 × (0,5 + 0,5 × uy tín/100)), lưu `recorded_by` (V26). Trạng thái `PENDING` / `DISPUTED` / `VOID` chỉ còn ở dữ liệu cũ khi đội trưởng tự nhập |
 | Giải đấu (2.1.9) | như trên | `tournament`, `tournament_team`, `tournament_match`, `team.tournament_banned_until` (V23) | Chủ sân là BTC. Vòng tròn > 5 đội chia bảng tối đa 4; loại trực tiếp bốc thăm, gọi lại để xếp vòng sau. Mỗi trận là `booking` `OWNER_LOCK` → dùng chung `no_slot_overlap`, trùng thì lùi 30 phút. Bỏ trận: 0-3, −20 uy tín **đội**, cấm 30 ngày, nhả slot |
 
-Job nền 60 giây (mục 8.2) có thêm: `restockCancelled`, `remindOverdue`, `refundCancelledWalletPayments`, `voidExpiredDisputes`.
+Job nền 60 giây (mục 8.2) có thêm: `restockCancelled`, `remindOverdue`, `refundCancelledWalletPayments`, `remindMatchResults`.
 
 ### 12.3 Còn thiếu / giả định
 
@@ -466,3 +451,15 @@ Job nền 60 giây (mục 8.2) có thêm: `restockCancelled`, `remindOverdue`, `
 | Ví & quỹ là giữ tiền người dùng | Cần xem quy định trung gian thanh toán trước khi chạy thật |
 | Giải vòng tròn nhiều bảng chưa có vòng loại trực tiếp sau vòng bảng | BTC tạo giải loại trực tiếp mới cho các đội đi tiếp |
 | Gia hạn khi chuyển thiếu = `max(hạn giữ chỗ, bây giờ + 5 phút)` | PRD ghi 5 phút, giữ chỗ mặc định 15 phút |
+
+### 12.4 Trợ lý chat (RAG)
+
+Module `backend/src/modules/chatbot/`: `chatbot.routes.js` (vòng chat), `chatbot.tools.js` (công cụ cho model), `chatbot.repository.js` (SQL kho tri thức), `chatbot.sitemap.js` (bản sao route frontend), `knowledge.routes.js` (CRUD admin). Gọi model qua `services/deepseek.service.js` (API tương thích OpenAI, biến `DEEPSEEK_API_KEY`).
+
+| Bước | Cách làm |
+|---|---|
+| Kho tri thức | Bảng `kb_article` (V28, seed V29): mỗi bài một chủ đề, `audience` ⊂ {GUEST, PLAYER, OWNER, ADMIN}, `route` trỏ trang frontend, `keywords` là cách hỏi khác. Admin sửa tại `/quan-tri/tro-ly` |
+| Truy xuất | Full-text `simple` trên văn bản đã bỏ dấu (`f_unaccent`, cột `search_vector` GENERATED) + thưởng cụm 2 âm tiết liền nhau (`<->`) + `word_similarity` trigram trên tiêu đề/từ khóa. Lọc `audience && [vai trò]`. Ngưỡng tuyệt đối 0,6 và tương đối 50% điểm bài đầu vì `ts_rank` không có IDF. Không dùng embedding: DeepSeek không có API embedding, image `postgres:16` không có pgvector |
+| Sinh câu trả lời | Mỗi lượt: truy xuất theo câu hỏi cuối (câu ngắn ghép thêm câu hỏi trước) → prompt hệ thống (vai trò + sitemap) + tài liệu tham khảo → model, tối đa 4 vòng gọi công cụ. `search_knowledge` cho mọi vai trò; `search_venues`, `get_venue_detail`, `find_free_slots` chỉ cho GUEST/PLAYER |
+| Theo cấu trúc web | Link markdown trong câu trả lời được lọc theo sitemap của vai trò; link tới trang không có / của vai trò khác bị bỏ, chỉ giữ chữ. Đổi route ở `App.jsx` phải sửa `chatbot.sitemap.js` |
+| Giới hạn | Không lưu hội thoại phía server; 20 lượt / 10 phút / user hoặc IP (Redis, dự phòng bộ nhớ). Trợ lý không tạo đơn, không đọc dữ liệu tài khoản |

@@ -323,24 +323,20 @@ Danh sách đóng tiền hiển thị chung cho cả đội (mọi thành viên 
 > PRD bổ sung 2.1.9 — ✅ đã cài (`/bang-xep-hang`, `/giai-dau/:id`, `/chu-san/giai-dau`). Giải vòng tròn chia bảng
 > nhưng chưa có vòng loại trực tiếp sau vòng bảng.
 
-**1.9.1 — Xác nhận tỷ số & tính Elo** (chỉ trận cáp kèo Team vs Team đã chốt, mục 1.5)
+**1.9.1 — Chủ sân nhập tỷ số & tính Elo** (chỉ trận cáp kèo Team vs Team đã chốt, mục 1.5)
+
+Chủ sân là bên trung lập chứng kiến trận nên tỷ số của chủ sân là kết quả chính thức; hai đội trưởng không tự nhập.
 
 ```mermaid
 flowchart TD
-    A(["Trận cáp kèo kết thúc<br/>(đơn COMPLETED)"]) --> B["Hai đội trưởng nhập tỷ số<br/>tại Lịch của tôi"]
-    B --> C{Cả hai đã nhập?}
-    C -->|Chưa| C1[Chờ đội còn lại]
-    C1 --> C
-    C -->|Rồi| D{Hai tỷ số khớp nhau?}
-    D -->|Khớp| E["Tính Elo: kết quả,<br/>chênh lệch Elo 2 đội,<br/>điểm Uy tín (Fair-play)"]
-    E --> F["Cập nhật Elo, số trận thắng,<br/>chuỗi thắng của 2 đội"]
+    A(["Trận cáp kèo kết thúc<br/>(đơn COMPLETED)"]) --> A1["Sau 10 phút: job nền nhắc chủ sân<br/>nhập tỷ số"]
+    A1 --> B["Chủ sân nhập tỷ số<br/>tại Đơn đặt sân (trong 14 ngày)"]
+    B --> E["Tính Elo: kết quả,<br/>chênh lệch Elo 2 đội,<br/>điểm Uy tín (Fair-play)"]
+    E --> E1["Chia tiền sân theo kèo thống nhất trước trận:<br/>đội thua chịu 50/60/70/100%, hòa chia đôi.<br/>Trước trận chỉ đóng cọc"]
+    E1 --> F["Cập nhật Elo, số trận thắng,<br/>chuỗi thắng của 2 đội"]
     F --> G[Cập nhật Bảng xếp hạng]
-    G --> Z1([Kết thúc])
-    D -->|"Lệch (A: 3-1, B: 2-2)"| H["Trạng thái: Xung đột kết quả.<br/>Thông báo 2 bên cập nhật lại trong 12 tiếng"]
-    H --> I{Thống nhất trong 12 tiếng?}
-    I -->|Có| E
-    I -->|Không| J["Trận không được tính Elo"]
-    J --> Z2([Kết thúc])
+    G --> H["Thông báo 2 đội trưởng: tỷ số,<br/>Elo +/-, số tiền đội chịu"]
+    H --> Z1([Kết thúc])
 ```
 
 **1.9.2 — Bảng xếp hạng**

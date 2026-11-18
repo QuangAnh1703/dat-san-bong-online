@@ -162,7 +162,7 @@ Danh sách error code: `backend/src/lib/errors.js`
 | WF-01 | Trang chủ | `/` (role player) | `pages/HomePage.jsx` | ✅ Có |
 | WF-02 | Tìm kiếm & bộ lọc | Section `#search-pitches` trên trang chủ | `HomePage` + `SearchBar` | 🟡 Chưa có route `/tim-san` riêng |
 | WF-03 | Chi tiết sân & lịch trống | `/san/:id` | `pages/VenueDetailPage.jsx` | ✅ Có |
-| WF-04 | Thanh toán tiền cọc (VNPay hoặc chuyển khoản VietQR) | Hiển thị ngay sau khi giữ chỗ; kết quả VNPay `/thanh-toan/ket-qua` | `components/PaymentPanel.jsx`, `pages/PaymentResultPage.jsx` | ✅ Có |
+| WF-04 | Thanh toán tiền cọc (VietQR + webhook ngân hàng SePay, đơn tự xác nhận) | Hiển thị ngay sau khi giữ chỗ | `components/PaymentPanel.jsx` (API `/api/payments/sepay`) | ✅ Có |
 | — | Tin nhắn (nhóm chat trận đã chốt kèo / ghép chân lẻ) | `/tin-nhan`, `/tin-nhan/:id` (cần đăng nhập) | `pages/MessagesPage.jsx` | ✅ Có |
 | — | Khiếu nại của tôi (theo dõi, bổ sung thông tin) | `/khieu-nai` (cần đăng nhập) | `pages/ComplaintsPage.jsx` | ✅ Có |
 | WF-05 | Đặt sân định kỳ | `/dat-dinh-ky` | `pages/SubscriptionPage.jsx` | ✅ Có |
@@ -173,11 +173,12 @@ Danh sách error code: `backend/src/lib/errors.js`
 | WF-09 | Hồ sơ & điểm uy tín | `/ho-so` (cần đăng nhập) | `pages/ProfilePage.jsx` | ✅ Có |
 | WF-10 | Dashboard chủ sân | `/` khi role = owner | `pages/OwnerDashboard.jsx` | ✅ Có |
 | — | Chủ sân: đơn đặt / lịch sân / bảng giá / cụm sân (đăng ký, sửa, gửi duyệt lại) | `/chu-san/don-dat`, `/chu-san/lich`, `/chu-san/bang-gia`, `/chu-san/cum-san`, `/chu-san/cum-san/moi`, `/chu-san/cum-san/:id` | `pages/Owner*Page.jsx`, `pages/OwnerVenueFormPage.jsx` | ✅ Có |
-| — | Đối soát chuyển khoản VietQR (giao dịch không tự khớp, chờ hoàn tiền) | `/chu-san/doi-soat`, `/quan-tri/doi-soat` | `pages/ReconciliationPage.jsx` (API `/api/payments/bank`) | ✅ Có |
 | — | Sổ quỹ & chia tiền trận | `/chia-tien/:code` (cần đăng nhập) | `pages/SplitBillPage.jsx` (API `/api/splits`) | ✅ Có |
 | — | Bảng xếp hạng Elo & giải đấu | `/bang-xep-hang?tab=giai-dau`, `/giai-dau/:id` | `pages/LeaderboardPage.jsx`, `pages/TournamentDetailPage.jsx` (API `/api/leaderboard`, `/api/tournaments`) | ✅ Có |
 | — | Chủ sân: căng-tin POS & kho / gói thành viên / giải đấu | `/chu-san/dich-vu`, `/chu-san/goi-thanh-vien`, `/chu-san/giai-dau` | `pages/OwnerServicesPage.jsx`, `pages/OwnerMembershipPage.jsx`, `pages/OwnerTournamentsPage.jsx` | ✅ Có |
 | — | Admin: ví hội viên đóng băng | `/quan-tri/vi-hoi-vien` | `pages/AdminWalletsPage.jsx` | ✅ Có |
+| — | Trợ lý chat (DeepSeek + RAG kho tri thức, theo vai trò; link ca trống `/san/:id?ngay=&san=&gio=`) | Bong bóng nổi mọi trang | `components/ChatbotWidget.jsx` (API `/api/chatbot/messages`) | ✅ Có |
+| — | Admin: kho tri thức trợ lý (RAG) | `/quan-tri/tro-ly` | `pages/AdminKnowledgePage.jsx` (API `/api/admin/knowledge`) | ✅ Có |
 | — | Đăng nhập Google (nhận token từ backend) | `/auth/google-callback` | `pages/GoogleCallbackPage.jsx` | ✅ Có |
 | — | Admin: tổng quan / người dùng / duyệt chủ sân / cụm sân / khiếu nại / báo cáo | `/` khi role = admin, `/quan-tri/nguoi-dung`, `/quan-tri/chu-san`, `/quan-tri/cum-san`, `/quan-tri/khieu-nai`, `/quan-tri/khieu-nai/:id`, `/quan-tri/bao-cao` | `pages/AdminDashboard.jsx`, `pages/Admin*Page.jsx` | ✅ Có |
 
@@ -198,7 +199,7 @@ Route `/` hiển thị theo vai trò của tài khoản (`role` trong `AppContex
 - `PageLayout`, `Card` - khung trang + khối nội dung (`components/ui/PageLayout.jsx`)
 - `Modal` - hộp thoại (`components/ui/Modal.jsx`), có Esc / bấm nền để đóng
 - `PitchCard` - thẻ sân
-- `PaymentPanel` - hướng dẫn chuyển cọc VietQR
+- `PaymentPanel` - mã VietQR thanh toán cọc, tự cập nhật khi SePay báo tiền về (API `/api/payments/sepay`)
 
 ## Quy ước khác
 
