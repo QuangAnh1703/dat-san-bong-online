@@ -15,6 +15,7 @@ import {
   BellRing,
 } from 'lucide-react';
 import { Modal } from './ui/Modal';
+import { LogoMark } from './ui/LogoMark';
 import heroImg from '../assets/images/hero_football_pitch_1790752166238.jpg';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -209,9 +210,7 @@ export const AuthModal = ({ onClose }) => {
 
   const logo = (
     <div className="inline-flex items-center gap-2.5">
-      <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-black text-white text-base">
-        SB
-      </div>
+      <LogoMark className="w-10 h-10" />
       <span className="text-2xl font-black text-white font-display">
         SanBong<span className="text-emerald-400">.vn</span>
       </span>

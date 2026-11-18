@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { NotificationBell } from './NotificationBell';
+import { LogoMark } from './ui/LogoMark';
 import {
   User,
   Building2,
@@ -152,9 +153,7 @@ export const Navbar = ({ onNavigateSection }) => {
             onClick={() => onNavigateSection('hero')}
             className="flex items-center gap-2 group text-left cursor-pointer shrink-0"
           >
-            <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-base tracking-tighter shadow-inner shadow-emerald-400/40 group-hover:bg-emerald-500 transition-colors">
-              SB
-            </div>
+            <LogoMark className="w-9 h-9 transition-transform group-hover:scale-105" />
             <span className="text-lg sm:text-xl font-extrabold tracking-tight text-white font-display lg:hidden xl:inline">
               SanBong<span className="text-emerald-400">.vn</span>
             </span>
