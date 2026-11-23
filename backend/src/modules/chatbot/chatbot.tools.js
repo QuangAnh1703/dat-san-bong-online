@@ -12,7 +12,7 @@ const KNOWLEDGE_TOOL = {
   function: {
     name: 'search_knowledge',
     description:
-      'Tra kho tri thức của SanBong.vn: cách dùng các trang, quy trình, chính sách (cọc, hủy, uy tín, giao hữu, chân lẻ...). ' +
+      'Tra kho tri thức của SanBong.id.vn: cách dùng các trang, quy trình, chính sách (cọc, hủy, uy tín, giao hữu, chân lẻ...). ' +
       'Gọi khi tài liệu tham khảo đã có chưa đủ để trả lời.',
     parameters: {
       type: 'object',

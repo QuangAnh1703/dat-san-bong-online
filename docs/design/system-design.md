@@ -1,4 +1,4 @@
-# Thiết kế hệ thống — SanBong.vn
+# Thiết kế hệ thống — SanBong.id.vn
 
 > Tài liệu tổng thể: hệ thống gồm những phần nào, dữ liệu đi qua đâu, và các quy tắc thiết kế
 > phải giữ khi thêm tính năng. Viết từ code hiện tại (tháng 10/2026), không phải từ PRD.

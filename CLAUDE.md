@@ -1,4 +1,4 @@
-# CLAUDE.md - SanBong.vn: Nền tảng đặt sân bóng đá trực tuyến
+# CLAUDE.md - SanBong.id.vn: Nền tảng đặt sân bóng đá trực tuyến
 
 ## Tóm tắt dự án
 

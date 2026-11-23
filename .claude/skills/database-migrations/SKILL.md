@@ -1,10 +1,10 @@
 ---
 name: database-migrations
-description: PostgreSQL migration rules for SanBong.vn - forward-only SQL files in csdl/db/migration, checksum-validated, one transaction per file. Use when creating or changing tables, columns, indexes, constraints, or seed data.
+description: PostgreSQL migration rules for SanBong.id.vn - forward-only SQL files in csdl/db/migration, checksum-validated, one transaction per file. Use when creating or changing tables, columns, indexes, constraints, or seed data.
 origin: ECC
 ---
 
-# Migration CSDL - SanBong.vn
+# Migration CSDL - SanBong.id.vn
 
 PostgreSQL 16 (Docker, `csdl/docker-compose.yml`, cổng 5433). Không ORM - migration là SQL thuần.
 

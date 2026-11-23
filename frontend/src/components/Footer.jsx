@@ -93,7 +93,7 @@ export const Footer = ({ onNavigateSection }) => {
               </div>
               <div className="flex items-center gap-2 text-slate-300">
                 <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>hotro@sanbong.vn</span>
+                <span>hotro@sanbong.id.vn</span>
               </div>
               <div className="flex items-center gap-2 text-slate-300">
                 <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -105,7 +105,7 @@ export const Footer = ({ onNavigateSection }) => {
 
         <div className="mt-10 pt-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[0.8125rem] text-slate-500">
           <div>
-            © 2026 SanBong.vn · Hệ thống vận hành sân bóng & cáp kèo số 1 Việt Nam. Bản quyền thuộc về SanBong Corp.
+            © 2026 SanBong.id.vn · Hệ thống vận hành sân bóng & cáp kèo số 1 Việt Nam. Bản quyền thuộc về SanBong Corp.
           </div>
           <div className="flex items-center gap-4">
             <a href="#privacy" className="hover:text-slate-400">

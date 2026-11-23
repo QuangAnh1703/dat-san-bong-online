@@ -1,4 +1,4 @@
-# AGENTS.md - SanBong.vn
+# AGENTS.md - SanBong.id.vn
 
 Hướng dẫn cho mọi AI coding agent (Claude Code, Codex, Cursor, Copilot...) làm việc trên repo này.
 

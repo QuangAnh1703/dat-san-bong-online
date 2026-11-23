@@ -44,7 +44,7 @@ async function sendViaBrevo({ to, subject, html, attachments = [] }) {
     signal: AbortSignal.timeout(15000),
     headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
-      sender: { email: fromAddress(), name: 'SanBong.vn' },
+      sender: { email: fromAddress(), name: 'SanBong.id.vn' },
       to: [{ email: to }],
       subject,
       htmlContent: html,
@@ -66,11 +66,11 @@ async function sendMail(mail) {
 async function sendOtpEmail(email, otp) {
   const mailOptions = {
     to: email,
-    subject: 'Mã xác minh OTP - SanBong.vn',
+    subject: 'Mã xác minh OTP - SanBong.id.vn',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #146B4A;">Xác minh email của bạn</h2>
-        <p>Cảm ơn bạn đã đăng ký tại <strong>SanBong.vn</strong></p>
+        <p>Cảm ơn bạn đã đăng ký tại <strong>SanBong.id.vn</strong></p>
         <p>Mã xác minh OTP của bạn là:</p>
         <div style="background: #f5f7f1; padding: 20px; border-radius: 8px; text-align: center;">
           <h1 style="color: #146B4A; letter-spacing: 5px; margin: 0;">${otp}</h1>

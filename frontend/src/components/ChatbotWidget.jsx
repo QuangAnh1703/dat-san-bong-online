@@ -11,7 +11,7 @@ const ROLE_CONFIG = {
     title: 'Trợ lý đặt sân',
     subtitle: 'Tìm sân, ca trống & cách dùng web',
     greeting:
-      'Chào bạn! Mình là trợ lý của SanBong.vn. Mình tìm sân, xem ca còn trống, và giải đáp cách đặt cọc, hủy đơn, ghép kèo, ghép chân lẻ... Bạn cần gì nào?',
+      'Chào bạn! Mình là trợ lý của SanBong.id.vn. Mình tìm sân, xem ca còn trống, và giải đáp cách đặt cọc, hủy đơn, ghép kèo, ghép chân lẻ... Bạn cần gì nào?',
     suggestions: ['Tối nay còn sân 7 nào trống?', 'Hủy sân có được hoàn cọc không?', 'Đội thiếu người thì làm sao?'],
     placeholder: 'VD: Tối mai 19h sân 7 ở Mỹ Đình',
     tone: {

@@ -1,10 +1,10 @@
 ---
 name: api-design
-description: REST API conventions for the SanBong.vn Express backend - route naming, status codes, pagination, errors via AppError, auth/RBAC, OpenAPI sync. Use when adding, changing, or reviewing an endpoint in backend/src/modules.
+description: REST API conventions for the SanBong.id.vn Express backend - route naming, status codes, pagination, errors via AppError, auth/RBAC, OpenAPI sync. Use when adding, changing, or reviewing an endpoint in backend/src/modules.
 license: MIT
 ---
 
-# Thiết kế API - SanBong.vn
+# Thiết kế API - SanBong.id.vn
 
 Backend: Express 4, CommonJS, `pg` thuần (không ORM, không TypeScript, không thư viện validate).
 

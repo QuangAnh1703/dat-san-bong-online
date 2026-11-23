@@ -735,7 +735,7 @@ router.get('/reports/export', async (req, res, next) => {
         const csv = await build();
         await sendMailWithAttachment({
           to: email,
-          subject: `Báo cáo SanBong.vn ${range.from} → ${range.to}`,
+          subject: `Báo cáo SanBong.id.vn ${range.from} → ${range.to}`,
           html: `<p>Báo cáo toàn hệ thống từ <b>${range.from}</b> đến <b>${range.to}</b> được đính kèm (mở bằng Excel).</p>`,
           filename,
           content: csv,

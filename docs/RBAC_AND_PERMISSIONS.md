@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the role-based access control (RBAC) system for SanBong.vn, implemented with Express middleware.
+This document describes the role-based access control (RBAC) system for SanBong.id.vn, implemented with Express middleware.
 
 **Roles:**
 - `PLAYER` (default) - Regular users who book fields

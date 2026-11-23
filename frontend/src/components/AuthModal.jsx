@@ -255,7 +255,7 @@ export const AuthModal = ({ onClose }) => {
                 ))}
               </ul>
             </div>
-            <p className="hidden lg:block text-xs text-slate-500">© SanBong.vn</p>
+            <p className="hidden lg:block text-xs text-slate-500">© SanBong.id.vn</p>
           </div>
         </aside>
 

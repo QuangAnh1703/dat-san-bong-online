@@ -242,7 +242,7 @@ export const HomePage = ({ onNavigateSection }) => {
         </div>
       </section>
 
-      {/* 5. Why SanBong.vn Value Pillars */}
+      {/* 5. Why SanBong.id.vn Value Pillars */}
       <section className="w-full py-16 bg-[#0b130e]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
@@ -250,7 +250,7 @@ export const HomePage = ({ onNavigateSection }) => {
               Lợi Ích Kép Cho Cả Người Chơi & Chủ Sân
             </h2>
             <p className="text-sm text-slate-400 mt-2">
-              SanBong.vn chuẩn hóa quy trình vận hành sân bóng phong trào số 1 Việt Nam.
+              SanBong.id.vn chuẩn hóa quy trình vận hành sân bóng phong trào số 1 Việt Nam.
             </p>
           </div>
 

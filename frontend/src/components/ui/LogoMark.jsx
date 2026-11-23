@@ -1,13 +1,13 @@
 import React, { useId } from 'react';
 
-// Logo SanBong.vn: mặt sân nhìn từ trên, vòng giữa sân là đồng hồ (giờ trống theo thời gian thực).
+// Logo SanBong.id.vn: mặt sân nhìn từ trên, vòng giữa sân là đồng hồ (giờ trống theo thời gian thực).
 // Bản file tĩnh nằm ở public/logo.svg; favicon dùng bản rút gọn public/favicon.svg.
 export const LogoMark = ({ className = 'w-9 h-9' }) => {
   // Mỗi lần dùng một id gradient riêng, tránh trùng khi có nhiều logo trên cùng trang
   const gradientId = useId();
   const ink = '#0b130e';
   return (
-    <svg viewBox="0 0 64 64" className={className} role="img" aria-label="SanBong.vn">
+    <svg viewBox="0 0 64 64" className={className} role="img" aria-label="SanBong.id.vn">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#34d399" />

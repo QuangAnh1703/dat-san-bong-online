@@ -1,5 +1,5 @@
 {
-  "name": "SanBong.vn - Nền Tảng Đặt Sân Bóng Đá Thông Minh",
+  "name": "SanBong.id.vn - Nền Tảng Đặt Sân Bóng Đá Thông Minh",
   "description": "Nền tảng đặt sân bóng đá trực tuyến thông minh, tìm đối cáp kèo giao hữu, đặt sân định kỳ và tối ưu doanh thu cho chủ sân.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -4,7 +4,7 @@
 
 1. Truy cập [Google Cloud Console](https://console.cloud.google.com/)
 2. Click **Select a Project** → **New Project**
-3. Nhập tên project: `SanBong.vn` (hoặc tên phù hợp)
+3. Nhập tên project: `SanBong.id.vn` (hoặc tên phù hợp)
 4. Click **Create**
 
 ## Bước 2: Bật Google+ API
@@ -22,7 +22,7 @@
    - Click **Create OAuth consent screen**
    - Chọn User Type: **External** → **Create**
    - Điền:
-     - **App name**: SanBong.vn
+     - **App name**: SanBong.id.vn
      - **Support email**: doquanganh200404@gmail.com
      - **Developer contact**: doquanganh200404@gmail.com
    - Click **Save and Continue** → **Save and Continue** → **Save and Continue**
@@ -30,7 +30,7 @@
 4. Quay lại **Credentials** → **Create Credentials** → **OAuth client ID**
 5. Chọn **Application type**: Web application
 6. Điền:
-   - **Name**: SanBong.vn Web Client
+   - **Name**: SanBong.id.vn Web Client
    - **Authorized JavaScript origins**:
      - `http://localhost:5173` (development)
      - `http://localhost:3000` (backend, nếu cần)

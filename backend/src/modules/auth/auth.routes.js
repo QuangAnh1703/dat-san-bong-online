@@ -266,7 +266,7 @@ router.get('/google', (req, res, next) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in with Google - SanBong.vn</title>
+  <title>Sign in with Google - SanBong.id.vn</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -411,7 +411,7 @@ router.get('/google', (req, res, next) => {
       <div class="header">
         <div class="google-logo">🔐</div>
         <h1>Sign in with Google</h1>
-        <p>for SanBong.vn</p>
+        <p>for SanBong.id.vn</p>
       </div>
 
       <form method="get" action="/api/auth/google/callback" onsubmit="return validateForm()">
