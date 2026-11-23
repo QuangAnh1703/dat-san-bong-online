@@ -59,7 +59,8 @@ async function single(c, { userId, fieldId, date, start, end, teamId = null, pay
   const f = await field(c, fieldId);
   const q = await quoteSlot(c, { venueId: f.venue_id, fieldType: f.type, playDate: date, start, end });
   const deposit = payFull ? q.amount : Math.round(q.amount * Number(f.deposit_rate));
-  const created = at(date, start, 24 * 3 + 5);
+  // Don cho tran xa trong tuong lai: ngay tao khong duoc vuot qua hien tai
+  const created = new Date(Math.min(at(date, start, 24 * 3 + 5).getTime(), Date.now() - 2 * 3600e3));
   const b = (
     await c.query(
       `INSERT INTO booking (code, kind, status, venue_id, user_id, team_id, total_amount, deposit_amount,
@@ -339,9 +340,13 @@ async function main() {
   console.log('Seed demo xong');
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-  })
-  .finally(() => pool.end());
+module.exports = { toMin, at, code, single, challenge, recurring, review, chat, paid };
+
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(() => pool.end());
+}
