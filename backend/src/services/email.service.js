@@ -3,11 +3,17 @@ const nodemailer = require('nodemailer');
 
 let transporter;
 
-// Render goi free chan cong SMTP -> co BREVO_API_KEY thi gui qua HTTP API cua Brevo thay vi Gmail SMTP
+// Render goi free chan cong SMTP -> co RESEND_API_KEY / BREVO_API_KEY thi gui qua HTTP API thay vi Gmail SMTP
+const useResend = () => Boolean(process.env.RESEND_API_KEY);
 const useBrevo = () => Boolean(process.env.BREVO_API_KEY);
 const fromAddress = () => process.env.EMAIL_FROM || process.env.GMAIL_USER;
 
 async function initializeEmail() {
+  if (useResend()) {
+    if (!process.env.EMAIL_FROM) throw new Error('thieu EMAIL_FROM (dia chi thuoc ten mien da xac minh tren Resend)');
+    console.log('[email] dung Resend HTTP API, nguoi gui %s', fromAddress());
+    return;
+  }
   if (useBrevo()) {
     if (!fromAddress()) throw new Error('thieu EMAIL_FROM (email nguoi gui da xac minh tren Brevo)');
     console.log('[email] dung Brevo HTTP API, nguoi gui %s', fromAddress());
@@ -57,7 +63,27 @@ async function sendViaBrevo({ to, subject, html, attachments = [] }) {
   return res.json();
 }
 
+async function sendViaResend({ to, subject, html, attachments = [] }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    signal: AbortSignal.timeout(15000),
+    headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      from: `SanBong.id.vn <${fromAddress()}>`,
+      to: [to],
+      subject,
+      html,
+      ...(attachments.length && {
+        attachments: attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })),
+      }),
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 async function sendMail(mail) {
+  if (useResend()) return sendViaResend(mail);
   if (useBrevo()) return sendViaBrevo(mail);
   if (!transporter) await initializeEmail();
   return transporter.sendMail({ from: fromAddress(), ...mail });

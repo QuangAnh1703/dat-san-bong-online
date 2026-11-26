@@ -75,7 +75,8 @@ Render free chặn cổng SMTP nên Gmail không gửi được. Server vẫn ch
 
 - Không cần email: bỏ qua. OTP qua số điện thoại hiện là giả lập (in ra log Render).
 - Nâng `sanbong-api` lên gói Starter (7 USD/tháng): mở SMTP, điền `GMAIL_USER` và `GMAIL_APP_PASSWORD` như ở máy.
-- Brevo (miễn phí 300 mail/ngày, gửi qua HTTP): xác minh email người gửi, tạo API key, điền `BREVO_API_KEY` và `EMAIL_FROM`.
+- Brevo (miễn phí 300 mail/ngày, gửi qua HTTP): xác minh email người gửi, tạo API key, điền `BREVO_API_KEY` và `EMAIL_FROM`. Tạo API key cần xác minh số điện thoại, số Việt Nam có thể không nhận được mã.
+- Resend (miễn phí 3.000 mail/tháng, gửi qua HTTP, được ưu tiên nếu có): thêm tên miền `sanbong.id.vn` trên Resend, tạo các bản ghi DNS Resend đưa (DKIM, SPF) ở iNET, tạo API key, điền `RESEND_API_KEY` và `EMAIL_FROM=no-reply@sanbong.id.vn`.
 
 ## Tên miền sanbong.id.vn
 

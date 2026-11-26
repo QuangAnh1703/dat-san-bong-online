@@ -77,7 +77,7 @@ const PORT = Number(process.env.PORT || 3000);
   } catch (err) {
     // Khong tat server: chi cac chuc nang gui mail (OTP email, xuat bao cao) bi anh huong
     console.error('[email] error: %s', err.message);
-    console.error('[email] check BREVO_API_KEY/EMAIL_FROM hoac GMAIL_USER/GMAIL_APP_PASSWORD in .env');
+    console.error('[email] check RESEND_API_KEY hoac BREVO_API_KEY (kem EMAIL_FROM) hoac GMAIL_USER/GMAIL_APP_PASSWORD in .env');
   }
   try {
     await validateSchema();
